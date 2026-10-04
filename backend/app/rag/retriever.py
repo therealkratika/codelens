@@ -1,5 +1,6 @@
 from rank_bm25 import BM25Okapi
 
+from app.rag.code_tracer import CodeTracer
 from app.rag.embeddings import EmbeddingModel
 from app.rag.vector_store import VectorStore
 from app.rag.reranker import Reranker
@@ -42,6 +43,10 @@ class Retriever:
 
         self.documents = data["documents"]
         self.metadatas = data["metadatas"]
+        self.code_tracer = CodeTracer(
+            self.documents,
+            self.metadatas
+        )
 
         # --------------------------------
         # Prepare BM25 keyword index
