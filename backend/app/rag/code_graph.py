@@ -1,12 +1,15 @@
-from collections import defaultdict
+from app.rag.import_resolver import ImportResolver
 
 
 class CodeGraph:
 
-    def __init__(self):
-
+    def __init__(self, repository_root):
         self.nodes = {}
         self.edges = []
+
+        self.import_resolver = ImportResolver(
+            repository_root
+        )
 
     def add_file(self, file_path, analysis):
 
@@ -17,12 +20,7 @@ class CodeGraph:
             "calls": analysis["calls"]
         }
 
-    def add_edge(
-        self,
-        source,
-        target,
-        relation
-    ):
+    def add_edge(self, source, target, relation):
 
         self.edges.append({
             "source": source,
@@ -47,45 +45,78 @@ class CodeGraph:
 
         return matches
 
+    def build_import_edges(self):
+
+        for file_path, node in self.nodes.items():
+
+            for import_data in node["imports"]:
+
+                import_source = import_data["source"]
+
+                target_file = self.import_resolver.resolve(
+                    file_path,
+                    import_source
+                )
+
+                if target_file is None:
+                    continue
+
+                self.add_edge(
+                    file_path,
+                    target_file,
+                    "imports"
+                )
+
     def build_call_edges(self):
 
         for file_path, node in self.nodes.items():
 
+            imported_symbols = {}
+
+            # Resolve imported functions
+            for import_data in node["imports"]:
+
+                import_source = import_data["source"]
+
+                target_file = self.import_resolver.resolve(
+                    file_path,
+                    import_source
+                )
+
+                if target_file is None:
+                    continue
+
+                for name in import_data["names"]:
+
+                    imported_symbols[name] = target_file
+
+            # Process calls
             for call in node["calls"]:
 
                 call_name = call["name"]
 
-                # Handle calls such as:
-                # Question.find
-                # Battle.create
-
+                # Ignore object methods such as:
+                # console.log()
+                # Question.find()
+                # socket.emit()
                 if "." in call_name:
+                    continue
 
-                    object_name = (
-                        call_name.split(".")[0]
-                    )
+                # Only create call edges for explicitly imported functions.
+                if call_name not in imported_symbols:
+                    continue
 
-                    method_name = (
-                        call_name.split(".")[-1]
-                    )
+                target_file = imported_symbols[call_name]
 
-                    matches = self.find_function(
-                        method_name
-                    )
+                # Never create self-edges.
+                if target_file == file_path:
+                    continue
 
-                else:
-
-                    matches = self.find_function(
-                        call_name
-                    )
-
-                for match in matches:
-
-                    self.add_edge(
-                        file_path,
-                        match["file"],
-                        f"calls:{call_name}"
-                    )
+                self.add_edge(
+                    file_path,
+                    target_file,
+                    f"calls:{call_name}"
+                )
 
     def get_edges_for_file(self, file_path):
 

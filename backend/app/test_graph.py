@@ -4,7 +4,10 @@ from app.rag.vector_store import VectorStore
 
 
 analyzer = CodeAnalyzer()
-graph = CodeGraph()
+REPOSITORY_ROOT = "./repositories/Nextja_coding_battle"
+graph = CodeGraph(
+    REPOSITORY_ROOT
+)
 vector_store = VectorStore()
 
 print("Building Code Graph...\n")
@@ -57,6 +60,7 @@ for file_path, chunks in files.items():
 
 
 # Build relationships
+graph.build_import_edges()
 graph.build_call_edges()
 
 
