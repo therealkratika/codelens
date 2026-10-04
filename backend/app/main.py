@@ -1,49 +1,89 @@
-from github.clone_repo import clone_repository
-from ingestion.loader import load_files
-from ingestion.chunker import chunk_documents
+from app.github.clone_repo import clone_repository
+from app.ingestion.loader import load_files
+from app.ingestion.chunker import chunk_documents
+
+from app.rag.embeddings import EmbeddingModel
+from app.rag.vector_store import VectorStore
 
 
 if __name__ == "__main__":
 
-    repo_url = input("Enter GitHub repository URL: ")
+    repo_url = input(
+        "Enter GitHub repository URL: "
+    )
 
-    repo_name = repo_url.rstrip("/").split("/")[-1]
+    repo_name = (
+        repo_url
+        .rstrip("/")
+        .split("/")[-1]
+    )
 
     if repo_name.endswith(".git"):
         repo_name = repo_name[:-4]
 
-    # 1. Clone
+    # -------------------------
+    # 1. Clone repository
+    # -------------------------
+
     repo_path = clone_repository(
         repo_url,
         repo_name
     )
 
+    # -------------------------
     # 2. Load files
-    documents = load_files(repo_path)
+    # -------------------------
 
-    print(f"\nLoaded {len(documents)} files")
+    documents = load_files(
+        repo_path
+    )
 
-    # 3. Chunk
-    chunks = chunk_documents(documents)
+    print(
+        f"\nLoaded {len(documents)} files"
+    )
 
-    print(f"Created {len(chunks)} chunks\n")
+    # -------------------------
+    # 3. Create chunks
+    # -------------------------
 
-    # Show first 5 chunks
+    chunks = chunk_documents(
+        documents
+    )
 
-    for chunk in chunks[:5]:
+    print(
+        f"Created {len(chunks)} chunks"
+    )
 
-        print("=" * 60)
+    # -------------------------
+    # 4. Create embeddings
+    # -------------------------
 
-        print(
-            f"File: {chunk['file']}"
-        )
+    embedding_model = EmbeddingModel()
 
-        print(
-            f"Lines: "
-            f"{chunk['start_line']}-"
-            f"{chunk['end_line']}"
-        )
+    texts = [
+        chunk["content"]
+        for chunk in chunks
+    ]
 
-        print()
+    embeddings = (
+        embedding_model
+        .generate_embeddings(texts)
+    )
 
-        print(chunk["content"][:500])
+    print(
+        f"Generated embeddings for "
+        f"{len(embeddings)} chunks"
+    )
+
+    # -------------------------
+    # 5. Store in ChromaDB
+    # -------------------------
+
+    vector_store = VectorStore()
+
+    vector_store.add_documents(
+        chunks,
+        embeddings
+    )
+
+    print("\nIndexing complete! ")
