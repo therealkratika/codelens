@@ -15,7 +15,7 @@ def main():
     )
 
     print("\n" + "=" * 70)
-    print("HYBRID RETRIEVAL RESULTS")
+    print("HYBRID + RERANKED RETRIEVAL RESULTS")
     print("=" * 70)
 
     for i, result in enumerate(
@@ -42,6 +42,11 @@ def main():
         print(
             f"Hybrid Score: "
             f"{result['hybrid_score']:.6f}"
+        )
+
+        print(
+            f"Rerank Score: "
+            f"{result['rerank_score']:.6f}"
         )
 
         print("\nCode:")
