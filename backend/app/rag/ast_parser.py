@@ -32,14 +32,69 @@ class JavaScriptParser:
 
             if node.type == "import_statement":
 
-                imports.append(
-                    code[
-                        node.start_byte:
-                        node.end_byte
-                    ]
+                source_node = node.child_by_field_name(
+                    "source"
                 )
 
-            for child in node.children:
+                if source_node:
+                    source = code[
+                        source_node.start_byte:
+                        source_node.end_byte
+                    ].strip("\"'")
+
+                    names = []
+
+                    for child in node.named_children:
+                        if child.type != "import_clause":
+                            continue
+
+                        for subchild in child.named_children:
+                            if subchild.type == "identifier":
+                                names.append(
+                                    code[
+                                        subchild.start_byte:
+                                        subchild.end_byte
+                                    ]
+                                )
+
+                            elif subchild.type == "named_imports":
+                                for imported in subchild.named_children:
+                                    if imported.type != "import_specifier":
+                                        continue
+
+                                    name_node = (
+                                        imported.child_by_field_name(
+                                            "name"
+                                        )
+                                        or imported.child_by_field_name(
+                                            "alias"
+                                        )
+                                    )
+
+                                    if name_node:
+                                        names.append(
+                                            code[
+                                                name_node.start_byte:
+                                                name_node.end_byte
+                                            ]
+                                        )
+
+                            elif subchild.type == "namespace_import":
+                                for imported in subchild.named_children:
+                                    if imported.type == "identifier":
+                                        names.append(
+                                            code[
+                                                imported.start_byte:
+                                                imported.end_byte
+                                            ]
+                                        )
+
+                    imports.append({
+                        "source": source,
+                        "names": names
+                    })
+
+            for child in node.named_children:
                 walk(child)
 
         walk(tree.root_node)

@@ -34,7 +34,7 @@ const joinBattle = () => {
     print("\nIMPORTS:")
 
     for item in imports:
-        print(f"→ {item}")
+        print(f"→ {item}\n")
 
     print("\nFUNCTIONS:")
 
