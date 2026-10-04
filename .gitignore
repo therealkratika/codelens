@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Cloned repositories and generated data
+/repositories/
+/backend/repositories/
+
+# Frontend dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Logs and operating system files
+*.log
+.DS_Store
