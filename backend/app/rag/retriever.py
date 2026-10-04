@@ -295,10 +295,7 @@ class Retriever:
             })
 
         return candidates
-
-    # =================================================
-    # FINAL RETRIEVAL + RERANKING
-    # =================================================
+    # FINAL RETRIEVAL + RERANKING + CODE BOOST
 
     def retrieve(
         self,
@@ -309,10 +306,7 @@ class Retriever:
         print(
             "\nRunning hybrid retrieval..."
         )
-
-        # --------------------------------
-        # Get 20 candidates
-        # --------------------------------
+        # 1. Get hybrid candidates
 
         candidates = self.hybrid_search(
             query,
@@ -323,21 +317,108 @@ class Retriever:
             f"Hybrid retrieval found "
             f"{len(candidates)} candidates."
         )
-
-        # --------------------------------
-        # Rerank candidates
-        # --------------------------------
+        # 2. Rerank all 20 candidates
 
         print(
             "Reranking candidates..."
         )
 
-        final_results = (
+        reranked_results = (
             self.reranker.rerank(
                 query,
                 candidates,
-                top_k=top_k
+                top_k=20
             )
+        )
+        # 3. Apply code-aware ranking
+
+        code_extensions = {
+            "js",
+            "jsx",
+            "ts",
+            "tsx",
+            "py",
+            "java",
+            "cpp",
+            "c",
+            "h",
+            "hpp",
+            "go",
+            "rs"
+        }
+
+        documentation_files = {
+            "readme.md",
+            "integration_guide.md",
+            "contributing.md",
+            "changelog.md"
+        }
+
+        for result in reranked_results:
+
+            file_path = result["metadata"]["file"]
+
+            extension = (
+                file_path
+                .split(".")[-1]
+                .lower()
+            )
+
+            file_name = (
+                file_path
+                .split("/")[-1]
+                .lower()
+            )
+
+            # --------------------------------
+            # Code boost
+            # --------------------------------
+
+            code_boost = 0.0
+
+            if extension in code_extensions:
+
+                code_boost = 1.0
+
+            # --------------------------------
+            # Documentation penalty
+            # --------------------------------
+
+            documentation_penalty = 0.0
+
+            if file_name in documentation_files:
+
+                documentation_penalty = 0.5
+
+            # --------------------------------
+            # Final score
+            # --------------------------------
+
+            result["code_boost"] = code_boost
+
+            result["documentation_penalty"] = (
+                documentation_penalty
+            )
+
+            result["final_score"] = (
+                result["rerank_score"]
+                + code_boost
+                - documentation_penalty
+            )
+
+        # --------------------------------
+        # 4. Sort by final score
+        # --------------------------------
+
+        reranked_results.sort(
+            key=lambda x: x["final_score"],
+            reverse=True
+        )
+
+        # 5. Return final top K
+
+        final_results = (
+            reranked_results[:top_k]
         )
 
         print(
