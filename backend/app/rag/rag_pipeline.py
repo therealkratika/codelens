@@ -16,8 +16,6 @@ class RAGPipeline:
 
     def answer(self, question):
 
-        # 1. Retrieve relevant code
-
         print("\nSearching codebase...")
 
         results = self.retriever.retrieve(
@@ -25,12 +23,7 @@ class RAGPipeline:
             top_k=5
         )
 
-        
-        # 2. Build context
-
         context = build_context(results)
-
-        # 3. Generate prompt
 
         prompt = f"""
 You are CodeLens, an AI assistant
@@ -50,25 +43,28 @@ IMPORTANT RULES:
 3. Explain the answer clearly and
    technically.
 
-4. Do NOT create a Sources section.
-   CodeLens will generate the sources
+4. Mention relevant file names and
+   line numbers when explaining the code.
+
+5. Do not create a separate Sources
+   section. CodeLens handles sources
    separately.
 
 USER QUESTION:
+
 {question}
 
 REPOSITORY CONTEXT:
+
 {context}
 
 Now answer the user's question.
 """
-        # 4. Generate answer
 
         print("Generating answer...")
 
         answer = self.llm.generate(prompt)
 
-        # 5. Generate trusted sources
         sources = []
 
         for result in results:
@@ -79,9 +75,9 @@ Now answer the user's question.
                 "file": metadata["file"],
                 "start_line": metadata["start_line"],
                 "end_line": metadata["end_line"],
-                "score": result["hybrid_score"]
+                "score": result["final_score"]
             })
-        # 6. Return answer + sources
+
         return {
             "answer": answer,
             "sources": sources
