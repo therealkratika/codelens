@@ -1,22 +1,20 @@
 def build_context(results):
 
-    documents = results["documents"][0]
-    metadatas = results["metadatas"][0]
-
     context_parts = []
 
-    for i in range(len(documents)):
+    for i, result in enumerate(results):
 
-        metadata = metadatas[i]
+        metadata = result["metadata"]
 
         file_path = metadata["file"]
         start_line = metadata["start_line"]
         end_line = metadata["end_line"]
 
-        code = documents[i]
+        code = result["document"]
 
-        # Detect language from file extension
-        extension = file_path.split(".")[-1].lower()
+        extension = (
+            file_path.split(".")[-1].lower()
+        )
 
         language_map = {
             "js": "javascript",
@@ -51,4 +49,5 @@ Lines: {start_line}-{end_line}
 ```
 """
         )
-        return "\n".join(context_parts)
+
+    return "\n".join(context_parts)

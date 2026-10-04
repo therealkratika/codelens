@@ -9,16 +9,28 @@ def main():
         "\nAsk CodeLens: "
     )
 
-    answer = rag.answer(
-        question
-    )
+    result = rag.answer(question)
 
     print("\n")
     print("=" * 70)
     print("CODELENS")
     print("=" * 70)
 
-    print(answer)
+    print("\nANSWER")
+    print("-" * 70)
+
+    print(result["answer"])
+
+    print("\nSOURCES")
+    print("-" * 70)
+
+    for source in result["sources"]:
+
+        print(
+            f"📄 {source['file']} "
+            f"(Lines {source['start_line']}-"
+            f"{source['end_line']})"
+        )
 
 
 if __name__ == "__main__":

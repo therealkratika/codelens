@@ -15,20 +15,19 @@ def main():
     )
 
     print("\n" + "=" * 70)
-    print("RETRIEVED RESULTS")
+    print("HYBRID RETRIEVAL RESULTS")
     print("=" * 70)
 
-    documents = results["documents"][0]
-    metadatas = results["metadatas"][0]
-    distances = results["distances"][0]
+    for i, result in enumerate(
+        results,
+        start=1
+    ):
 
-    for i in range(len(documents)):
-
-        metadata = metadatas[i]
+        metadata = result["metadata"]
 
         print("\n" + "-" * 70)
 
-        print(f"Result #{i + 1}")
+        print(f"Result #{i}")
 
         print(
             f"File: {metadata['file']}"
@@ -41,13 +40,14 @@ def main():
         )
 
         print(
-            f"Distance: {distances[i]:.4f}"
+            f"Hybrid Score: "
+            f"{result['hybrid_score']:.6f}"
         )
 
         print("\nCode:")
 
         print(
-            documents[i][:1000]
+            result["document"][:1000]
         )
 
 

@@ -16,9 +16,7 @@ class RAGPipeline:
 
     def answer(self, question):
 
-        # --------------------------------
         # 1. Retrieve relevant code
-        # --------------------------------
 
         print("\nSearching codebase...")
 
@@ -27,44 +25,34 @@ class RAGPipeline:
             top_k=5
         )
 
-        # --------------------------------
+        
         # 2. Build context
-        # --------------------------------
 
-        context = build_context(
-            results
-        )
+        context = build_context(results)
 
-        # --------------------------------
-        # 3. Create prompt
-        # --------------------------------
+        # 3. Generate prompt
 
         prompt = f"""
 You are CodeLens, an AI assistant
 that understands software repositories.
 
-Your job is to answer questions about
-the user's codebase.
+Answer the user's question using ONLY
+the repository context provided below.
 
 IMPORTANT RULES:
 
-1. Use ONLY the provided repository
-   context to answer.
+1. Do not invent files, functions,
+   variables, APIs, or behavior.
 
-2. Do NOT invent files, functions,
-   APIs, variables, or behavior.
+2. If the context does not contain
+   enough information, say so clearly.
 
-3. If the provided context does not
-   contain enough information, clearly
-   say that you could not find enough
-   information in the codebase.
+3. Explain the answer clearly and
+   technically.
 
-4. Explain the answer clearly.
-
-5. When referring to code, mention the
-   relevant file and line numbers.
-
-6. At the end, provide a Sources section.
+4. Do NOT create a Sources section.
+   CodeLens will generate the sources
+   separately.
 
 USER QUESTION:
 {question}
@@ -74,15 +62,27 @@ REPOSITORY CONTEXT:
 
 Now answer the user's question.
 """
-
-        # --------------------------------
-        # 4. Send context to LLM
-        # --------------------------------
+        # 4. Generate answer
 
         print("Generating answer...")
 
-        answer = self.llm.generate(
-            prompt
-        )
+        answer = self.llm.generate(prompt)
 
-        return answer
+        # 5. Generate trusted sources
+        sources = []
+
+        for result in results:
+
+            metadata = result["metadata"]
+
+            sources.append({
+                "file": metadata["file"],
+                "start_line": metadata["start_line"],
+                "end_line": metadata["end_line"],
+                "score": result["hybrid_score"]
+            })
+        # 6. Return answer + sources
+        return {
+            "answer": answer,
+            "sources": sources
+        }
