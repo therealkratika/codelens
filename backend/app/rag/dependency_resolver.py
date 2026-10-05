@@ -100,6 +100,117 @@ class DependencyResolver:
 
         return dependencies
 
+    def trace_function_dependencies(
+        self,
+        file_path,
+        code,
+        function_name
+    ):
+        """
+        Find which imported dependencies are actually used
+        inside a specific function.
+        """
+
+        dependencies = self.analyze_file(
+            file_path,
+            code
+        )
+
+        function_code = self._extract_function_code(
+            code,
+            function_name
+        )
+
+        if function_code is None:
+            return []
+
+        results = []
+
+        for dependency in dependencies:
+            symbol = dependency["symbol"]
+
+            pattern = re.compile(
+                rf"\b{re.escape(symbol)}\b"
+            )
+
+            if pattern.search(function_code):
+                results.append(dependency)
+
+        return results
+
+    def _extract_function_code(self, code, function_name):
+
+        escaped_name = re.escape(function_name)
+
+        declaration_pattern = re.compile(
+            rf"(?:async\s+)?function\s+{escaped_name}\s*"
+            rf"\([^)]*\)\s*\{{"
+        )
+
+        arrow_pattern = re.compile(
+            rf"(?:const|let|var)\s+{escaped_name}\s*=\s*"
+            rf"(?:async\s*)?"
+            rf"(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\{{"
+        )
+
+        match = declaration_pattern.search(code)
+
+        if match is None:
+            match = arrow_pattern.search(code)
+
+        if match is None:
+            return None
+
+        body_start = match.end() - 1
+        brace_depth = 0
+        quote = None
+        escaped = False
+        line_comment = False
+        block_comment = False
+        index = body_start
+
+        while index < len(code):
+            character = code[index]
+            next_character = (
+                code[index + 1]
+                if index + 1 < len(code)
+                else ""
+            )
+
+            if line_comment:
+                if character == "\n":
+                    line_comment = False
+            elif block_comment:
+                if character == "*" and next_character == "/":
+                    block_comment = False
+                    index += 1
+            elif quote is not None:
+                if escaped:
+                    escaped = False
+                elif character == "\\":
+                    escaped = True
+                elif character == quote:
+                    quote = None
+            elif character == "/" and next_character == "/":
+                line_comment = True
+                index += 1
+            elif character == "/" and next_character == "*":
+                block_comment = True
+                index += 1
+            elif character in {"'", '"', "`"}:
+                quote = character
+            elif character == "{":
+                brace_depth += 1
+            elif character == "}":
+                brace_depth -= 1
+
+                if brace_depth == 0:
+                    return code[match.start():index + 1]
+
+            index += 1
+
+        return code[match.start():]
+
     def _parse_destructured_names(self, text):
         names = []
 
