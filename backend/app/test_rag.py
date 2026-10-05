@@ -3,23 +3,45 @@ from app.rag.rag_pipeline import RAGPipeline
 
 def main():
 
-    rag = RAGPipeline()
+    repository_root = "./repositories/Nextja_coding_battle"
+
+    rag = RAGPipeline(
+        repository_root
+    )
 
     question = input(
         "\nAsk CodeLens: "
     )
 
-    result = rag.answer(question)
+    answer_started = False
 
-    print("\n")
-    print("=" * 70)
-    print("CODELENS")
-    print("=" * 70)
+    def display_answer_text(text):
+        nonlocal answer_started
 
-    print("\nANSWER")
-    print("-" * 70)
+        if not answer_started:
+            print("\n")
+            print("=" * 70)
+            print("CODELENS")
+            print("=" * 70)
+            print("\nANSWER")
+            print("-" * 70)
+            answer_started = True
 
-    print(result["answer"])
+        print(text, end="", flush=True)
+
+    result = rag.answer(
+        question,
+        on_text=display_answer_text
+    )
+
+    if not answer_started:
+        print("\n")
+        print("=" * 70)
+        print("CODELENS")
+        print("=" * 70)
+        print("\nANSWER")
+        print("-" * 70)
+        print(result["answer"])
 
     print("\nSOURCES")
     print("-" * 70)
@@ -27,7 +49,7 @@ def main():
     for source in result["sources"]:
 
         print(
-            f"📄 {source['file']} "
+            f"{source['file']} "
             f"(Lines {source['start_line']}-"
             f"{source['end_line']})"
         )

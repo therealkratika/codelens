@@ -305,7 +305,8 @@ class Retriever:
     def retrieve(
         self,
         query,
-        top_k=5
+        top_k=5,
+        prefer_code=False
     ):
 
         print(
@@ -361,39 +362,30 @@ class Retriever:
 
         for result in reranked_results:
 
-            file_path = result["metadata"]["file"]
-
-            extension = (
-                file_path
-                .split(".")[-1]
-                .lower()
-            )
-
-            file_name = (
-                file_path
-                .split("/")[-1]
-                .lower()
-            )
-
-            # --------------------------------
-            # Code boost
-            # --------------------------------
-
             code_boost = 0.0
-
-            if extension in code_extensions:
-
-                code_boost = 1.0
-
-            # --------------------------------
-            # Documentation penalty
-            # --------------------------------
-
             documentation_penalty = 0.0
 
-            if file_name in documentation_files:
+            if prefer_code:
 
-                documentation_penalty = 0.5
+                file_path = result["metadata"]["file"]
+
+                extension = (
+                    file_path
+                    .rsplit(".", 1)[-1]
+                    .lower()
+                )
+
+                file_name = (
+                    file_path
+                    .rsplit("/", 1)[-1]
+                    .lower()
+                )
+
+                if extension in code_extensions:
+                    code_boost = 1.0
+
+                if file_name in documentation_files:
+                    documentation_penalty = 0.5
 
             # --------------------------------
             # Final score
