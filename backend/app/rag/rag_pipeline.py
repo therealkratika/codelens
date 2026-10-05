@@ -1,5 +1,6 @@
 from app.rag.retriever import Retriever
 from app.rag.context_builder import build_context
+from app.rag.feature_flow import FeatureFlowAnalyzer
 from app.rag.llm import LLM
 
 
@@ -11,6 +12,9 @@ class RAGPipeline:
 
         self.retriever = Retriever()
         self.llm = LLM()
+        self.feature_flow = FeatureFlowAnalyzer(
+            "./repositories/Nextja_coding_battle"
+        )
 
         print("CodeLens RAG ready!")
 
