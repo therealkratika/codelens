@@ -1,5 +1,6 @@
 
 from collections.abc import Callable
+import re
 
 from app.rag.retriever import Retriever
 from app.rag.context_builder import build_context
@@ -27,87 +28,97 @@ class RAGPipeline:
         print("CodeLens RAG ready!")
 
     # FEATURE FLOW DETECTION
-    def detect_feature_flows(self, results):
+    def detect_feature_flows(self, results, question=""):
+
+        del results
+
+        api_file = "frontend/lib/api.ts"
+        api_results = self.feature_flow.trace_frontend_api(
+            api_file
+        )
+
+        question_words = set(
+            re.findall(r"[a-z0-9]+", question.lower())
+        )
+
+        ignored_words = {
+            "a",
+            "an",
+            "and",
+            "does",
+            "for",
+            "how",
+            "is",
+            "of",
+            "the",
+            "to",
+            "what",
+            "when",
+            "where",
+            "which",
+            "who",
+            "why"
+        }
+        question_words.difference_update(ignored_words)
+
+        scored_apis = []
+
+        for api in api_results:
+            function_name = api.get(
+                "function",
+                ""
+            )
+
+            searchable_name = re.sub(
+                r"([a-z0-9])([A-Z])",
+                r"\1 \2",
+                function_name
+            ).lower()
+
+            function_words = set(
+                re.findall(
+                    r"[a-z0-9]+",
+                    searchable_name
+                )
+            )
+            function_words.difference_update({
+                "get",
+                "fetch",
+                "request",
+                "api"
+            })
+
+            relevance = len(
+                question_words.intersection(function_words)
+            )
+
+            if relevance:
+                scored_apis.append((relevance, api))
+
+        if not scored_apis:
+            return []
+
+        best_score = max(
+            score
+            for score, _ in scored_apis
+        )
+
+        selected_apis = [
+            api
+            for score, api in scored_apis
+            if score == best_score
+        ]
 
         flows = []
 
-        processed_route_files = set()
-        processed_routes = set()
-
-        for result in results:
-
-            file_path = result["metadata"]["file"]
-
-            # We do not assume a specific backend/frontend structure.
-            # Simply check whether the retrieved file contains routes.
-            route_path = (
-                f"{self.repository_root}/{file_path}"
+        for api in selected_apis:
+            flow = self.feature_flow.trace_api_feature_flow(
+                api_file=api_file,
+                api_function=api["function"]
             )
 
-            try:
-
-                with open(
-                    route_path,
-                    "r",
-                    encoding="utf-8"
-                ) as file:
-
-                    code = file.read()
-
-            except (FileNotFoundError, UnicodeDecodeError):
-
-                continue
-
-            # Ask RouteAnalyzer whether this file contains routes.
-            routes = self.feature_flow.route_analyzer.analyze_route_file(
-                file_path,
-                code
-            )
-
-            if not routes:
-                continue
-
-            if file_path in processed_route_files:
-                continue
-
-            processed_route_files.add(file_path)
-
-            # Try every route discovered in this file.
-            for route in routes:
-
-                handler = route.get("handler")
-
-                if not handler:
-                    continue
-
-                route_key = (
-                    file_path,
-                    handler
-                )
-
-                if route_key in processed_routes:
-                    continue
-
-                processed_routes.add(route_key)
-
-                # Find the server/application file that mounts this
-                # route instead of assuming a specific filename.
-                server_file = self.find_server_file(
-                    file_path
-                )
-
-                if server_file is None:
-                    continue
-
-                flow = self.feature_flow.trace_route(
-                    route_file=file_path,
-                    server_file=server_file,
-                    handler=handler
-                )
-
-                if flow is not None:
-
-                    flows.append(flow)
+            if flow is not None:
+                flows.append(flow)
 
         return flows
 
@@ -236,47 +247,106 @@ class RAGPipeline:
     def build_feature_flow_context(self, feature_flows):
 
         if not feature_flows:
-
             return ""
 
         context_parts = [
-            "\n\nFEATURE FLOWS:\n"
+            "\n\nFEATURE FLOW:\n"
         ]
 
         for flow in feature_flows:
 
-            route = flow.get("route", {})
+            frontend_api = flow.get(
+                "frontend_api"
+            )
+
+            if frontend_api:
+                context_parts.append(
+                    "\nFrontend API:\n"
+                )
+                context_parts.append(
+                    f"- Function: "
+                    f"{frontend_api.get('function', 'Unknown')}()\n"
+                )
+                context_parts.append(
+                    f"- File: "
+                    f"{frontend_api.get('file', 'Unknown')}\n"
+                )
+                context_parts.append(
+                    f"- Line: "
+                    f"{frontend_api.get('line', 'Unknown')}\n"
+                )
+                context_parts.append(
+                    f"- Method: "
+                    f"{frontend_api.get('method', 'Unknown')}\n"
+                )
+                context_parts.append(
+                    f"- Endpoint: "
+                    f"{frontend_api.get('resolved_endpoint', 'Unknown')}\n"
+                )
+
+            route = flow.get(
+                "route",
+                {}
+            )
+
+            context_parts.append(
+                "\nBackend Route:\n"
+            )
+            context_parts.append(
+                f"- File: "
+                f"{route.get('route_file', 'Unknown')}\n"
+            )
+            context_parts.append(
+                f"- Line: "
+                f"{route.get('route_line', 'Unknown')}\n"
+            )
+            context_parts.append(
+                f"- Method: "
+                f"{route.get('method', 'Unknown')}\n"
+            )
+            context_parts.append(
+                f"- Path: "
+                f"{route.get('path', 'Unknown')}\n"
+            )
+            context_parts.append(
+                f"- Handler: "
+                f"{route.get('handler', 'Unknown')}\n"
+            )
+
             controller = flow.get("controller")
 
             context_parts.append(
-                f"""
- Route:
-{route.get("method", "Unknown")} {route.get("path", "Unknown")}
-
-Handler:
-{route.get("handler", "Unknown")}
-
-Controller:
-{
-    controller.get("controller_file", "Unknown")
-    if controller
-    else "Unknown"
-}
-
-Function:
-{
-    controller.get("function", "Unknown")
-    if controller
-    else "Unknown"
-}
-
-Dependencies:
-"""
+                "\nController:\n"
             )
+
+            if controller:
+                context_parts.append(
+                    f"- File: "
+                    f"{controller.get('controller_file', 'Unknown')}\n"
+                )
+                context_parts.append(
+                    f"- Function: "
+                    f"{controller.get('controller_function', 'Unknown')}\n"
+                )
+                context_parts.append(
+                    f"- Lines: "
+                    f"{controller.get('controller_start_line', 'Unknown')}-"
+                    f"{controller.get('controller_end_line', 'Unknown')}\n"
+                )
+            else:
+                context_parts.append(
+                    "- File: Unknown\n"
+                    "- Function: Unknown\n"
+                    "- Lines: Unknown\n"
+                )
 
             dependencies = flow.get(
                 "dependencies",
                 []
+            )
+
+            context_parts.append(
+                "\nDependencies:\n"
             )
 
             if dependencies:
@@ -352,8 +422,15 @@ Dependencies:
             )
 
             feature_flows = self.detect_feature_flows(
-                results
+                results,
+                question
             )
+
+            print("\nDEBUG FEATURE FLOWS")
+            print("=" * 70)
+            for flow in feature_flows:
+                print(flow)
+            print("=" * 70)
 
         # 4. ADD FEATURE FLOW CONTEXT
 

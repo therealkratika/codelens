@@ -412,15 +412,26 @@ class Retriever:
             reverse=True
         )
 
-        # 5. Return final top K
+        # 5. Keep the highest-ranked result from each file
+        unique_results = []
+        seen_files = set()
 
-        final_results = (
-            reranked_results[:top_k]
-        )
+        for result in reranked_results:
+
+            file_path = result["metadata"]["file"]
+
+            if file_path in seen_files:
+                continue
+
+            seen_files.add(file_path)
+            unique_results.append(result)
+
+            if len(unique_results) == top_k:
+                break
 
         print(
             f"Returning top "
-            f"{len(final_results)} results."
+            f"{len(unique_results)} results."
         )
 
-        return final_results
+        return unique_results
