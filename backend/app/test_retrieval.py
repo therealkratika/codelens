@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+if __package__ is None or __package__ == "":
+    backend_root = Path(__file__).resolve().parent.parent
+    if str(backend_root) not in sys.path:
+        sys.path.insert(0, str(backend_root))
+
 from abc import ABC, abstractmethod
 
 from app.rag.retriever import Retriever

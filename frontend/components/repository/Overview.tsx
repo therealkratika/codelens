@@ -17,21 +17,18 @@ import type {
 interface OverviewProps {
   repository: RepositoryDetails;
   importSummary: RepositoryImportResponse | null;
+  suggestedPrompts: string[];
+  suggestionsError: string | null;
   onOpenChat: (initialQuestion?: string) => void;
   onOpenArchitecture: () => void;
   onOpenFiles: () => void;
 }
 
-const suggestedPrompts = [
-  "How is room creation and battle matching implemented?",
-  "Where are API routes registered and connected to controllers?",
-  "What dependencies does battleController use?",
-  "How does the frontend API client talk to the server?",
-];
-
 export function Overview({
   repository,
   importSummary,
+  suggestedPrompts,
+  suggestionsError,
   onOpenChat,
   onOpenArchitecture,
   onOpenFiles,
@@ -54,7 +51,7 @@ export function Overview({
       <div className="overview-stats-grid">
         <div className="panel stat-card">
           <div className="stat-card-icon stat-icon-files">
-            <FolderTree className="w-5 h-5 text-blue-500" />
+            <FolderTree className="w-5 h-5 text-emerald-500" />
           </div>
           <div className="stat-card-info">
             <span className="stat-big-val">{fileCount}</span>
@@ -72,7 +69,7 @@ export function Overview({
 
         <div className="panel stat-card">
           <div className="stat-card-icon stat-icon-chunks">
-            <Code2 className="w-5 h-5 text-indigo-500" />
+            <Code2 className="w-5 h-5 text-stone-400" />
           </div>
           <div className="stat-card-info">
             <span className="stat-big-val">{chunkCount}</span>
@@ -108,7 +105,7 @@ export function Overview({
 
         <div className="panel stat-card">
           <div className="stat-card-icon stat-icon-chat">
-            <MessageSquareCode className="w-5 h-5 text-purple-500" />
+            <MessageSquareCode className="w-5 h-5 text-emerald-500" />
           </div>
           <div className="stat-card-info">
             <span className="stat-big-val">AI RAG</span>
@@ -136,7 +133,7 @@ export function Overview({
         <div className="panel feature-action-card">
           <div className="feature-card-header">
             <div className="feature-icon-wrapper icon-bg-chat">
-              <MessageSquareCode className="w-5 h-5 text-purple-500" />
+              <MessageSquareCode className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
               <h3>Codebase Q&amp;A</h3>
@@ -146,6 +143,9 @@ export function Overview({
 
           <div className="feature-prompts-list">
             <span className="prompts-heading">TRY ASKING:</span>
+            {suggestionsError ? (
+              <p className="import-note" role="alert">{suggestionsError}</p>
+            ) : null}
             {suggestedPrompts.map((prompt) => (
               <button
                 key={prompt}
@@ -212,7 +212,7 @@ export function Overview({
         <div className="panel feature-action-card">
           <div className="feature-card-header">
             <div className="feature-icon-wrapper icon-bg-files">
-              <FolderTree className="w-5 h-5 text-blue-500" />
+              <FolderTree className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
               <h3>Files &amp; Vector Chunks</h3>
@@ -224,7 +224,7 @@ export function Overview({
             <span className="prompts-heading">KEY CODEBASE DIRECTORIES:</span>
             <div className="dir-pill-list">
               <div className="dir-pill">
-                <FileCode className="w-3.5 h-3.5 text-blue-500" />
+                <FileCode className="w-3.5 h-3.5 text-emerald-500" />
                 <span>frontend/lib/api.ts (17 chunks)</span>
               </div>
               <div className="dir-pill">

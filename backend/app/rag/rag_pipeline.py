@@ -17,7 +17,7 @@ class RAGPipeline:
 
         self.repository_root = repository_root
 
-        self.retriever = Retriever()
+        self.retriever = Retriever(repository_root)
         self.llm = LLM()
         self.query_router = QueryRouter()
 

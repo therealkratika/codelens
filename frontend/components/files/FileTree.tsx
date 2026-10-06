@@ -29,19 +29,19 @@ function getFileIcon(extension?: string) {
   switch (extension) {
     case ".ts":
     case ".tsx":
-      return <FileCode className="w-4 h-4 text-blue-500 flex-shrink-0" />;
+      return <FileCode className="w-4 h-4 text-emerald-500 flex-shrink-0" />;
     case ".js":
     case ".jsx":
       return <FileCode className="w-4 h-4 text-amber-500 flex-shrink-0" />;
     case ".json":
       return <FileJson className="w-4 h-4 text-emerald-500 flex-shrink-0" />;
     case ".md":
-      return <FileText className="w-4 h-4 text-purple-400 flex-shrink-0" />;
+      return <FileText className="w-4 h-4 text-stone-400 flex-shrink-0" />;
     case ".css":
     case ".scss":
-      return <FileSpreadsheet className="w-4 h-4 text-cyan-400 flex-shrink-0" />;
+      return <FileSpreadsheet className="w-4 h-4 text-amber-400 flex-shrink-0" />;
     case ".py":
-      return <FileCode className="w-4 h-4 text-indigo-400 flex-shrink-0" />;
+      return <FileCode className="w-4 h-4 text-lime-500 flex-shrink-0" />;
     default:
       return <File className="w-4 h-4 text-muted flex-shrink-0" />;
   }

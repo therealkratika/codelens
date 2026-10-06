@@ -5,6 +5,7 @@ export interface RepositoryImportRequest {
 export interface RepositoryImportResponse {
   repository: string;
   repository_path: string;
+  repo_url: string;
   files: number;
   chunks: number;
   status: "indexed";
@@ -25,4 +26,22 @@ export interface RepositoryDetails {
   loaded: true;
   repository: string;
   repository_path: string;
+}
+
+export interface SavedRepository {
+  repository: string;
+  repository_path: string;
+  repo_url: string | null;
+  files: number;
+  chunks: number;
+}
+
+export interface SavedRepositoriesResponse {
+  repositories: SavedRepository[];
+  active_repository_path: string | null;
+}
+
+export interface RepositorySuggestionsResponse {
+  repository: string;
+  suggestions: string[];
 }

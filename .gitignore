@@ -17,6 +17,7 @@ ENV/
 # Cloned repositories and generated data
 /repositories/
 /backend/repositories/
+/backend/repository_state.json
 
 # Frontend dependencies and build output
 node_modules/

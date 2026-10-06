@@ -9,21 +9,18 @@ interface ChatInputProps {
   isLoading: boolean;
   onAsk: (question: string) => Promise<void>;
   messages: ChatMessageData[];
+  suggestions: string[];
+  suggestionsError: string | null;
   prefilledQuestion?: string;
   onClearPrefill?: () => void;
 }
-
-const suggestions = [
-  "How is room creation and battle matching implemented?",
-  "Where are API requests handled and mapped to routes?",
-  "What dependencies does battleController have?",
-  "How does the frontend API client talk to the server?",
-];
 
 export function ChatInput({
   isLoading,
   onAsk,
   messages,
+  suggestions,
+  suggestionsError,
   prefilledQuestion,
   onClearPrefill,
 }: ChatInputProps) {
@@ -59,7 +56,10 @@ export function ChatInput({
 
   return (
     <div className="chat-entry">
-      {messages.length === 0 && !isLoading ? (
+      {messages.length === 0 && suggestionsError ? (
+        <p className="import-note" role="alert">{suggestionsError}</p>
+      ) : null}
+      {messages.length === 0 && !isLoading && suggestions.length > 0 ? (
         <div className="suggestion-list" aria-label="Suggested questions">
           {suggestions.map((suggestion) => (
             <button

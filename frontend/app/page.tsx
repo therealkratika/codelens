@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { Overview } from "@/components/repository/Overview";
@@ -9,6 +9,7 @@ import { FilesView } from "@/components/files/FilesView";
 import { RepositoryImport } from "@/components/repository/RepositoryImport";
 import { useChat } from "@/hooks/useChat";
 import { useRepository } from "@/hooks/useRepository";
+import { getRepositorySuggestions } from "@/lib/api/repository";
 import type { WorkspaceView } from "@/types/ui";
 import type { FeatureFlow } from "@/types/architecture";
 
@@ -17,6 +18,11 @@ export default function Home() {
   const chat = useChat();
   const [activeView, setActiveView] = useState<WorkspaceView>("overview");
   const [showImportModal, setShowImportModal] = useState(false);
+  const [suggestionData, setSuggestionData] = useState<{
+    repositoryPath: string;
+    suggestions: string[];
+    error: string | null;
+  } | null>(null);
 
   // Cross-view navigation state
   const [prefilledChatQuestion, setPrefilledChatQuestion] = useState<string>("");
@@ -25,6 +31,52 @@ export default function Home() {
 
   const repository = repositoryState.repository;
   const isLoaded = repository !== null && !showImportModal;
+  const repositoryPath = repository?.repository_path;
+  const repositoryName = repository?.repository;
+  const clearChat = chat.clearChat;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!repositoryPath || !repositoryName) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getRepositorySuggestions()
+      .then((result) => {
+        if (!cancelled && result.repository === repositoryName) {
+          setSuggestionData({
+            repositoryPath,
+            suggestions: result.suggestions,
+            error: null,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSuggestionData({
+            repositoryPath,
+            suggestions: [],
+            error: "Could not load suggested questions for this repository.",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repositoryPath, repositoryName]);
+
+  const repositorySuggestions =
+    repositoryPath && suggestionData?.repositoryPath === repositoryPath
+      ? suggestionData.suggestions
+      : [];
+  const suggestionError =
+    repositoryPath && suggestionData?.repositoryPath === repositoryPath
+      ? suggestionData.error
+      : null;
 
   const handleOpenChatWithQuestion = useCallback((question?: string) => {
     if (question) {
@@ -57,11 +109,30 @@ export default function Home() {
 
   const handleCompletedImport = useCallback(
     async (repoUrl: string) => {
-      await repositoryState.importRepository(repoUrl);
-      setShowImportModal(false);
-      setActiveView("overview");
+      const imported = await repositoryState.importRepository(repoUrl);
+      if (imported) {
+        clearChat();
+        setPrefilledChatQuestion("");
+        setShowImportModal(false);
+        setActiveView("overview");
+      }
+      return imported;
     },
-    [repositoryState],
+    [repositoryState, clearChat],
+  );
+
+  const handleActivateRepository = useCallback(
+    async (repositoryPath: string) => {
+      const activated = await repositoryState.activateRepository(repositoryPath);
+      if (activated) {
+        clearChat();
+        setPrefilledChatQuestion("");
+        setShowImportModal(false);
+        setActiveView("overview");
+      }
+      return activated;
+    },
+    [repositoryState, clearChat],
   );
 
   return (
@@ -95,14 +166,26 @@ export default function Home() {
           )}
           <RepositoryImport
             isImporting={repositoryState.isImporting}
+            isActivating={repositoryState.isActivating}
             error={repositoryState.error}
             statusError={repositoryState.statusError}
+            savedRepositories={repositoryState.savedRepositories}
+            activeRepositoryPath={
+              repository?.repository_path ??
+              repositoryState.savedRepositories.find(
+                (saved) => saved.repository === repository?.repository,
+              )?.repository_path ??
+              null
+            }
             onImport={handleCompletedImport}
+            onActivate={handleActivateRepository}
           />
         </div>
       ) : activeView === "chat" ? (
         <ChatInterface
           messages={chat.messages}
+          suggestions={repositorySuggestions}
+          suggestionsError={suggestionError}
           isLoading={chat.isLoading}
           error={chat.error}
           prefilledQuestion={prefilledChatQuestion}
@@ -116,6 +199,8 @@ export default function Home() {
         <Overview
           repository={repository}
           importSummary={repositoryState.importSummary}
+          suggestedPrompts={repositorySuggestions}
+          suggestionsError={suggestionError}
           onOpenChat={handleOpenChatWithQuestion}
           onOpenArchitecture={() => setActiveView("architecture")}
           onOpenFiles={() => setActiveView("files")}
@@ -135,6 +220,8 @@ export default function Home() {
         <Overview
           repository={repository}
           importSummary={repositoryState.importSummary}
+          suggestedPrompts={repositorySuggestions}
+          suggestionsError={suggestionError}
           onOpenChat={handleOpenChatWithQuestion}
           onOpenArchitecture={() => setActiveView("architecture")}
           onOpenFiles={() => setActiveView("files")}

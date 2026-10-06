@@ -8,6 +8,8 @@ import type { ChatMessage as ChatMessageData } from "@/types/ui";
 
 interface ChatInterfaceProps {
   messages: ChatMessageData[];
+  suggestions: string[];
+  suggestionsError: string | null;
   isLoading: boolean;
   error: string | null;
   prefilledQuestion?: string;
@@ -20,6 +22,8 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({
   messages,
+  suggestions,
+  suggestionsError,
   isLoading,
   error,
   prefilledQuestion,
@@ -88,6 +92,8 @@ export function ChatInterface({
       <ChatInput
         messages={messages}
         isLoading={isLoading}
+        suggestions={suggestions}
+        suggestionsError={suggestionsError}
         onAsk={onAsk}
         prefilledQuestion={prefilledQuestion}
         onClearPrefill={onClearPrefill}

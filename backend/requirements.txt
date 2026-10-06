@@ -4,3 +4,7 @@ sentence-transformers
 google-genai
 httpx
 python-dotenv
+fastapi
+uvicorn
+rank-bm25
+tree-sitter-javascript

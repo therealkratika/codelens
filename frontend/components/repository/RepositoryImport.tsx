@@ -5,19 +5,28 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Spinner } from "@/components/common/Spinner";
+import type { SavedRepository } from "@/types/repository";
 
 interface RepositoryImportProps {
   isImporting: boolean;
+  isActivating: boolean;
   error: string | null;
   statusError: string | null;
-  onImport: (repoUrl: string) => Promise<void>;
+  savedRepositories: SavedRepository[];
+  activeRepositoryPath: string | null;
+  onImport: (repoUrl: string) => Promise<boolean>;
+  onActivate: (repositoryPath: string) => Promise<boolean>;
 }
 
 export function RepositoryImport({
   isImporting,
+  isActivating,
   error,
   statusError,
+  savedRepositories,
+  activeRepositoryPath,
   onImport,
+  onActivate,
 }: RepositoryImportProps) {
   const [repoUrl, setRepoUrl] = useState("");
 
@@ -51,7 +60,7 @@ export function RepositoryImport({
             placeholder="https://github.com/owner/repository"
             value={repoUrl}
             onChange={(event) => setRepoUrl(event.target.value)}
-            disabled={isImporting}
+            disabled={isImporting || isActivating}
             required
           />
           <p className="import-note">
@@ -61,7 +70,7 @@ export function RepositoryImport({
           <Button
             type="submit"
             wide
-            disabled={isImporting || !repoUrl.trim()}
+            disabled={isImporting || isActivating || !repoUrl.trim()}
           >
             {isImporting ? (
               <>
@@ -85,6 +94,44 @@ export function RepositoryImport({
             </div>
           ) : null}
         </form>
+        {savedRepositories.length > 0 ? (
+          <section className="panel import-panel" aria-labelledby="saved-repositories-heading">
+            <h2 id="saved-repositories-heading">Your repositories</h2>
+            <p className="import-note">
+              Repositories stay indexed on this backend. Select one to switch
+              without importing it again.
+            </p>
+            <ul className="saved-repository-list">
+              {savedRepositories.map((repository) => {
+                const isActive =
+                  repository.repository_path === activeRepositoryPath;
+                return (
+                  <li key={repository.repository_path}>
+                    <div>
+                      <strong>{repository.repository}</strong>
+                      {repository.repo_url ? (
+                        <span>{repository.repo_url}</span>
+                      ) : (
+                        <span>Local repository</span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={isImporting || isActivating || isActive}
+                      onClick={() => void onActivate(repository.repository_path)}
+                    >
+                      {isActivating && !isActive
+                        ? "Switching..."
+                        : isActive
+                          ? "Current"
+                          : "Switch"}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ) : null}
       </div>
     </main>
   );

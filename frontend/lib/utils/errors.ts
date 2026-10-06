@@ -1,13 +1,11 @@
 import { ApiError, ApiTimeoutError } from "@/lib/api/client";
 
-export type ErrorContext = "status" | "import" | "chat";
+export type ErrorContext = "status" | "import" | "activate" | "chat";
 
 export function getUserError(
   error: unknown,
   context: ErrorContext,
 ): string {
-  console.error(`CodeLens ${context} request failed:`, error);
-
   if (error instanceof ApiTimeoutError) {
     return context === "import"
       ? "Repository indexing is taking longer than expected. Check the server status and try again."
@@ -21,9 +19,13 @@ export function getUserError(
 
     if (context === "import") {
       if (error.status === 400 || error.status === 422) {
-        return "Unable to import this repository. Check that the URL points to a public GitHub repository.";
+        return error.message;
       }
-      return "Unable to import this repository. Check the GitHub URL and try again.";
+      return error.message || "Unable to import this repository.";
+    }
+
+    if (context === "activate") {
+      return "Unable to switch to that repository. It may have been removed; try importing it again.";
     }
 
     if (error.status === 400 || error.status === 404) {
@@ -36,6 +38,8 @@ export function getUserError(
     ? "Unable to connect to CodeLens. Make sure the backend is running, then try again."
     : context === "import"
       ? "Unable to import this repository. Check the GitHub URL and try again."
+      : context === "activate"
+        ? "Unable to switch repositories. Please try again."
       : "CodeLens could not answer that question. Check your connection and try again.";
 }
 

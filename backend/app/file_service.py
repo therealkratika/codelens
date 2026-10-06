@@ -6,7 +6,7 @@ from app.rag.vector_store import VectorStore
 class FileService:
     def __init__(self, repository_path: str):
         self.repository_path = repository_path
-        self.vector_store = VectorStore()
+        self.vector_store = VectorStore(repository_path)
         self._chunks_by_file: Optional[Dict[str, List[Dict[str, Any]]]] = None
 
     def _load_chunks(self) -> Dict[str, List[Dict[str, Any]]]:

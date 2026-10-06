@@ -13,7 +13,7 @@ class ArchitectureService:
         self.repository_path = repository_path
         self.analyzer = FeatureFlowAnalyzer(repository_path)
         self.code_analyzer = CodeAnalyzer()
-        self.vector_store = VectorStore()
+        self.vector_store = VectorStore(repository_path)
         self._flows_cache: Optional[List[Dict[str, Any]]] = None
         self._graph_cache: Optional[Dict[str, Any]] = None
 

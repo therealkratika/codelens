@@ -8,7 +8,7 @@ from app.rag.reranker import Reranker
 
 class Retriever:
 
-    def __init__(self):
+    def __init__(self, repository_path=None):
 
         print("Initializing retriever...")
 
@@ -22,7 +22,7 @@ class Retriever:
         # Vector store
         # --------------------------------
 
-        self.vector_store = VectorStore()
+        self.vector_store = VectorStore(repository_path)
 
         # --------------------------------
         # Reranker

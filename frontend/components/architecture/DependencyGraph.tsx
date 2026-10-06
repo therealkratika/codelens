@@ -192,7 +192,7 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                 {/* Outgoing Imports */}
                 <div className="inspector-section">
                   <div className="section-title-row">
-                    <ArrowUpRight className="w-4 h-4 text-blue-500" />
+                    <ArrowUpRight className="w-4 h-4 text-emerald-500" />
                     <h4>Imports / Dependencies ({outgoingEdges.length})</h4>
                   </div>
                   {outgoingEdges.length === 0 ? (
@@ -257,7 +257,7 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
               {/* Declared Functions */}
               <div className="inspector-section mt-4">
                 <div className="section-title-row">
-                  <Code2 className="w-4 h-4 text-indigo-500" />
+                  <Code2 className="w-4 h-4 text-stone-400" />
                   <h4>Exported Functions ({selectedNode.functions.length})</h4>
                 </div>
                 {selectedNode.functions.length === 0 ? (
