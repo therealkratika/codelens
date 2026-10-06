@@ -2,6 +2,7 @@ import os
 import time
 from collections.abc import Callable
 
+import httpx
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors
@@ -28,7 +29,7 @@ class LLM:
         self.client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(
-                timeout=30_000,
+                timeout=60_000,
                 retry_options=types.HttpRetryOptions(
                     attempts=1
                 )
@@ -97,6 +98,38 @@ class LLM:
                 )
                 return answer
 
+            except httpx.TimeoutException as error:
+                if output_parts:
+                    partial_answer = "".join(output_parts)
+
+                    print(
+                        "\nGemini stream timed out, "
+                        "returning partial response.",
+                        flush=True
+                    )
+
+                    return partial_answer
+
+                if attempt + 1 < max_attempts:
+                    wait_seconds = 2 ** attempt
+
+                    print(
+                        "Gemini stream timed out before producing text; "
+                        f"retrying in {wait_seconds} seconds.",
+                        flush=True
+                    )
+                    time.sleep(wait_seconds)
+                    continue
+
+                print(
+                    f"\nGemini request timed out: {error}",
+                    flush=True
+                )
+                raise RuntimeError(
+                    "Gemini timed out before returning any text after "
+                    f"{max_attempts} attempts. Please try again later."
+                ) from error
+
             except errors.APIError as error:
                 can_retry = (
                     error.code in retryable_status_codes
@@ -119,6 +152,17 @@ class LLM:
                     f"\nGemini request failed: {error}",
                     flush=True
                 )
+
+                if output_parts:
+                    partial_answer = "".join(output_parts)
+
+                    print(
+                        "\nGemini stream interrupted, "
+                        "returning partial response.",
+                        flush=True
+                    )
+
+                    return partial_answer
 
                 if error.code in retryable_status_codes:
                     raise RuntimeError(

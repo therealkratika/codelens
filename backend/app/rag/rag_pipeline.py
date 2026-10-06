@@ -27,15 +27,84 @@ class RAGPipeline:
 
         print("CodeLens RAG ready!")
 
+    def find_api_files(self):
+        import os
+
+        api_files = []
+        ignored_dirs = {
+            ".git",
+            "node_modules",
+            "venv",
+            ".venv",
+            "__pycache__",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+            ".cache",
+            "out",
+            "target",
+        }
+        api_file_names = {
+            "api.js",
+            "api.jsx",
+            "api.ts",
+            "api.tsx",
+            "client.js",
+            "client.ts",
+            "http.js",
+            "http.ts",
+        }
+
+        for root, dirs, files in os.walk(self.repository_root):
+            dirs[:] = [
+                directory
+                for directory in dirs
+                if directory not in ignored_dirs
+            ]
+
+            for filename in files:
+                if filename.lower() not in api_file_names:
+                    continue
+
+                full_path = os.path.join(
+                    root,
+                    filename
+                )
+                relative_path = os.path.relpath(
+                    full_path,
+                    self.repository_root
+                )
+
+                api_files.append(
+                    relative_path.replace(
+                        os.sep,
+                        "/"
+                    )
+                )
+
+        return api_files
+
     # FEATURE FLOW DETECTION
     def detect_feature_flows(self, results, question=""):
 
         del results
 
-        api_file = "frontend/lib/api.ts"
-        api_results = self.feature_flow.trace_frontend_api(
-            api_file
-        )
+        api_files = self.find_api_files()
+
+        if not api_files:
+            return []
+
+        api_results = []
+
+        for api_file in api_files:
+            results = self.feature_flow.trace_frontend_api(
+                api_file
+            )
+
+            for api in results:
+                api["_api_file"] = api_file
+                api_results.append(api)
 
         question_words = set(
             re.findall(r"[a-z0-9]+", question.lower())
@@ -57,9 +126,72 @@ class RAGPipeline:
             "where",
             "which",
             "who",
-            "why"
+            "why",
+            "can",
+            "could",
+            "would",
+            "should",
+            "someone",
+            "something",
         }
-        question_words.difference_update(ignored_words)
+        question_words.difference_update(
+            ignored_words
+        )
+
+        # Words that commonly describe API intent.
+        intent_words = {
+            "create": {
+                "create",
+                "created",
+                "creating",
+                "creation",
+                "start",
+                "starts"
+            },
+            "join": {
+                "join",
+                "joining",
+                "enter",
+                "enters",
+                "entered",
+                "room"
+            },
+            "leave": {
+                "leave",
+                "leaving",
+                "exit",
+                "remove",
+                "removed"
+            },
+            "get": {
+                "get",
+                "fetch",
+                "retrieve",
+                "load",
+                "loads",
+                "fetching"
+            },
+            "submit": {
+                "submit",
+                "submitting",
+                "submission",
+                "send",
+                "sending"
+            },
+            "update": {
+                "update",
+                "updating",
+                "edit",
+                "change",
+                "modify"
+            },
+            "delete": {
+                "delete",
+                "deleting",
+                "remove",
+                "removing"
+            },
+        }
 
         scored_apis = []
 
@@ -68,8 +200,17 @@ class RAGPipeline:
                 "function",
                 ""
             )
+            endpoint = api.get(
+                "resolved_endpoint",
+                ""
+            )
+            method = api.get(
+                "method",
+                ""
+            )
 
-            searchable_name = re.sub(
+            # Convert camelCase into separate words.
+            searchable_function = re.sub(
                 r"([a-z0-9])([A-Z])",
                 r"\1 \2",
                 function_name
@@ -78,19 +219,57 @@ class RAGPipeline:
             function_words = set(
                 re.findall(
                     r"[a-z0-9]+",
-                    searchable_name
+                    searchable_function
                 )
             )
-            function_words.difference_update({
-                "get",
-                "fetch",
-                "request",
-                "api"
-            })
-
-            relevance = len(
-                question_words.intersection(function_words)
+            endpoint_words = set(
+                re.findall(
+                    r"[a-z0-9]+",
+                    endpoint.lower()
+                )
             )
+
+            matched_intents = {
+                intent
+                for intent, words in intent_words.items()
+                if question_words.intersection(words)
+                and function_words.intersection(words)
+            }
+
+            intent_score = len(matched_intents) * 5
+
+            function_overlap = question_words.intersection(
+                function_words - {
+                    "get",
+                    "fetch",
+                    "request",
+                    "api"
+                }
+            )
+            endpoint_overlap = question_words.intersection(
+                endpoint_words - {
+                    "https",
+                    "http",
+                    "api",
+                    "com",
+                    "org",
+                    "net",
+                    "onrender"
+                }
+            )
+
+            relevance = (
+                intent_score
+                + len(function_overlap) * 2
+                + len(endpoint_overlap)
+            )
+
+            # GET is the conventional HTTP verb for read/fetch APIs.
+            if (
+                "get" in matched_intents
+                and method.upper() == "GET"
+            ):
+                relevance += 1
 
             if relevance:
                 scored_apis.append((relevance, api))
@@ -113,7 +292,7 @@ class RAGPipeline:
 
         for api in selected_apis:
             flow = self.feature_flow.trace_api_feature_flow(
-                api_file=api_file,
+                api_file=api["_api_file"],
                 api_function=api["function"]
             )
 
@@ -379,6 +558,80 @@ class RAGPipeline:
 
     # MAIN RAG PIPELINE
 
+    def build_feature_flow_fallback(
+        self,
+        question,
+        feature_flows
+    ):
+
+        del question
+
+        if not feature_flows:
+            return (
+                "CodeLens could not generate an answer because "
+                "the LLM is currently unavailable."
+            )
+
+        lines = [
+            "The LLM is currently unavailable, but "
+            "CodeLens successfully traced the feature flow.\n"
+        ]
+
+        for flow in feature_flows:
+            frontend_api = flow.get("frontend_api")
+
+            if frontend_api:
+                lines.append(
+                    f"Frontend: "
+                    f"{frontend_api.get('function', 'Unknown')}() "
+                    f"at {frontend_api.get('file', 'Unknown')}:"
+                    f"{frontend_api.get('line', 'Unknown')}"
+                )
+                lines.append(
+                    f"HTTP: "
+                    f"{frontend_api.get('method', 'Unknown')} "
+                    f"{frontend_api.get('resolved_endpoint', 'Unknown')}"
+                )
+
+            route = flow.get("route")
+
+            if route:
+                lines.append(
+                    f"Backend Route: "
+                    f"{route.get('method', 'Unknown')} "
+                    f"{route.get('path', 'Unknown')}"
+                )
+                lines.append(
+                    f"at {route.get('route_file', 'Unknown')}:"
+                    f"{route.get('route_line', 'Unknown')}"
+                )
+
+            controller = flow.get("controller")
+
+            if controller:
+                lines.append(
+                    f"Controller: "
+                    f"{controller.get('controller_function', 'Unknown')}()"
+                )
+                lines.append(
+                    f"at {controller.get('controller_file', 'Unknown')}:"
+                    f"{controller.get('controller_start_line', 'Unknown')}-"
+                    f"{controller.get('controller_end_line', 'Unknown')}"
+                )
+
+            dependencies = flow.get("dependencies", [])
+
+            if dependencies:
+                lines.append("Dependencies:")
+
+                for dependency in dependencies:
+                    lines.append(
+                        f"- {dependency.get('symbol', 'Unknown')} → "
+                        f"{dependency.get('target_file', 'Unknown')}"
+                    )
+
+        return "\n".join(lines)
+
     def answer(
         self,
         question,
@@ -497,15 +750,32 @@ Now answer the user's question.
             "Generating answer..."
         )
 
-        answer = self.llm.generate(
-            prompt,
-            on_text=on_text
-        )
+        try:
+            answer = self.llm.generate(
+                prompt,
+                on_text=on_text
+            )
+        except RuntimeError as error:
+            print(
+                f"\nLLM unavailable: {error}",
+                flush=True
+            )
+
+            if feature_flows:
+                answer = self.build_feature_flow_fallback(
+                    question,
+                    feature_flows
+                )
+                if on_text is not None:
+                    on_text(answer)
+            else:
+                raise
 
         # 7. BUILD SOURCES
 
         sources = []
 
+        # Sources from normal retrieval
         for result in results:
 
             metadata = result["metadata"]
@@ -516,6 +786,75 @@ Now answer the user's question.
                 "end_line": metadata["end_line"],
                 "score": result["final_score"]
             })
+
+        # Add sources discovered through feature-flow tracing
+        if feature_flows:
+            for flow in feature_flows:
+                frontend_api = flow.get("frontend_api")
+
+                if frontend_api:
+                    sources.append({
+                        "file": frontend_api.get("file"),
+                        "start_line": frontend_api.get("line"),
+                        "end_line": frontend_api.get("line")
+                    })
+
+                route = flow.get("route")
+
+                if route:
+                    sources.append({
+                        "file": route.get("route_file"),
+                        "start_line": route.get("route_line"),
+                        "end_line": route.get("route_line")
+                    })
+
+                    if route.get("mount_file"):
+                        sources.append({
+                            "file": route.get("mount_file"),
+                            "start_line": route.get("mount_line"),
+                            "end_line": route.get("mount_line")
+                        })
+
+                controller = flow.get("controller")
+
+                if controller:
+                    sources.append({
+                        "file": controller.get("controller_file"),
+                        "start_line": controller.get(
+                            "controller_start_line"
+                        ),
+                        "end_line": controller.get(
+                            "controller_end_line"
+                        )
+                    })
+
+                for dependency in flow.get("dependencies", []):
+                    target_file = dependency.get("target_file")
+
+                    if target_file:
+                        sources.append({
+                            "file": target_file,
+                            "start_line": None,
+                            "end_line": None
+                        })
+
+        unique_sources = []
+        seen_sources = set()
+
+        for source in sources:
+            key = (
+                source.get("file"),
+                source.get("start_line"),
+                source.get("end_line")
+            )
+
+            if key in seen_sources:
+                continue
+
+            seen_sources.add(key)
+            unique_sources.append(source)
+
+        sources = unique_sources
 
         # 8. RETURN RESPONSE
 

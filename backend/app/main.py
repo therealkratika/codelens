@@ -1,89 +1,144 @@
-from app.github.clone_repo import clone_repository
-from app.ingestion.loader import load_files
-from app.ingestion.chunker import chunk_documents
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-from app.rag.embeddings import EmbeddingModel
-from app.rag.vector_store import VectorStore
+from app.repository_service import RepositoryService
+from app.repository_manager import RepositoryManager
 
 
-if __name__ == "__main__":
+app = FastAPI(
+    title="CodeLens API",
+    description="AI Codebase Intelligence Backend",
+    version="1.0.0"
+)
+# Services
+repository_service = RepositoryService()
+repository_manager = RepositoryManager()
 
-    repo_url = input(
-        "Enter GitHub repository URL: "
-    )
+# Request Models
 
-    repo_name = (
-        repo_url
-        .rstrip("/")
-        .split("/")[-1]
-    )
+class RepositoryImportRequest(BaseModel):
+    repo_url: str
 
-    if repo_name.endswith(".git"):
-        repo_name = repo_name[:-4]
 
-    # -------------------------
-    # 1. Clone repository
-    # -------------------------
+class ChatRequest(BaseModel):
+    question: str
 
-    repo_path = clone_repository(
-        repo_url,
-        repo_name
-    )
+# Root
 
-    # -------------------------
-    # 2. Load files
-    # -------------------------
+@app.get("/")
+def root():
 
-    documents = load_files(
-        repo_path
-    )
+    return {
+        "name": "CodeLens API",
+        "status": "running"
+    }
 
-    print(
-        f"\nLoaded {len(documents)} files"
-    )
+# Repository Import
 
-    # -------------------------
-    # 3. Create chunks
-    # -------------------------
+@app.post("/api/repository/import")
+def import_repository(
+    request: RepositoryImportRequest
+):
 
-    chunks = chunk_documents(
-        documents
-    )
+    try:
 
-    print(
-        f"Created {len(chunks)} chunks"
-    )
+        # Clone + load + chunk + embed + store
+        result = repository_service.import_repository(
+            request.repo_url
+        )
 
-    # -------------------------
-    # 4. Create embeddings
-    # -------------------------
+        # Initialize RAG for this repository
+        repository_manager.set_repository(
+            repository_name=result["repository"],
+            repository_path=result["repository_path"]
+        )
 
-    embedding_model = EmbeddingModel()
+        return result
 
-    texts = [
-        chunk["content"]
-        for chunk in chunks
-    ]
+    except Exception as error:
 
-    embeddings = (
-        embedding_model
-        .generate_embeddings(texts)
-    )
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
 
-    print(
-        f"Generated embeddings for "
-        f"{len(embeddings)} chunks"
-    )
+# Repository Status
 
-    # -------------------------
-    # 5. Store in ChromaDB
-    # -------------------------
+@app.get("/api/repository/status")
+def repository_status():
 
-    vector_store = VectorStore()
+    if not repository_manager.is_loaded():
 
-    vector_store.add_documents(
-        chunks,
-        embeddings
-    )
+        return {
+            "loaded": False,
+            "repository": None
+        }
 
-    print("\nIndexing complete! ")
+    return {
+        "loaded": True,
+        "repository": repository_manager.get_repository(),
+        "repository_path": repository_manager.get_repository_path()
+    }
+
+
+@app.get("/api/repository")
+def get_repository():
+
+    if not repository_manager.is_loaded():
+        raise HTTPException(
+            status_code=404,
+            detail="No repository has been imported yet."
+        )
+
+    return {
+        "repository": repository_manager.get_repository(),
+        "repository_path": repository_manager.get_repository_path(),
+        "loaded": True
+    }
+
+
+# =========================
+# Chat
+# =========================
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+
+    if not repository_manager.is_loaded():
+
+        raise HTTPException(
+            status_code=400,
+            detail="No repository has been imported yet."
+        )
+
+    if not request.question.strip():
+
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty."
+        )
+
+    try:
+
+        rag_pipeline = (
+            repository_manager
+            .get_rag_pipeline()
+        )
+
+        result = rag_pipeline.answer(
+            request.question
+        )
+
+        return {
+            "repository": repository_manager.get_repository(),
+            "question": request.question,
+            "answer": result["answer"],
+            "sources": result["sources"]
+        }
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
