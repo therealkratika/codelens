@@ -57,8 +57,10 @@ class Retriever:
             for document in self.documents
         ]
 
-        self.bm25 = BM25Okapi(
-            tokenized_documents
+        self.bm25 = (
+            BM25Okapi(tokenized_documents)
+            if tokenized_documents
+            else None
         )
 
         print(
@@ -143,6 +145,9 @@ class Retriever:
         query,
         top_k=20
     ):
+
+        if self.bm25 is None:
+            return []
 
         # Tokenize query
         query_tokens = self.tokenize(

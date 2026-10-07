@@ -60,10 +60,6 @@ a {
   text-decoration: none;
 }
 
-/* =========================================================
-   App Shell & TopBar
-   ========================================================= */
-
 .app-frame {
   display: flex;
   min-height: 100vh;
@@ -176,10 +172,6 @@ a {
   color: var(--ink);
   border-color: var(--line-strong);
 }
-
-/* =========================================================
-   Workspace Layout & Sidebar
-   ========================================================= */
 
 .workspace {
   display: flex;
