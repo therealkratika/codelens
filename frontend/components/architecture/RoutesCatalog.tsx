@@ -7,6 +7,13 @@ import {
   Search,
 } from "lucide-react";
 import type { FeatureFlow } from "@/types/architecture";
+import {
+  getFileLocationText,
+  getFlowMethod,
+  getHandlerName,
+  getMethodBadgeClass,
+  getRoutePath,
+} from "@/lib/architecture";
 
 interface RoutesCatalogProps {
   flows: FeatureFlow[];
@@ -24,12 +31,9 @@ export function RoutesCatalog({
 
   const filteredRoutes = useMemo(() => {
     return flows.filter((flow) => {
-      const method =
-        flow.route?.method || flow.frontend_api?.method || "POST";
-      const path =
-        flow.route?.path || flow.frontend_api?.endpoint || "";
-      const handler =
-        flow.route?.handler || flow.name;
+      const method = getFlowMethod(flow);
+      const path = getRoutePath(flow);
+      const handler = getHandlerName(flow);
 
       if (methodFilter !== "ALL" && method !== methodFilter) {
         return false;
@@ -104,16 +108,17 @@ export function RoutesCatalog({
               </tr>
             ) : (
               filteredRoutes.map((flow) => {
-                const method =
-                  flow.route?.method || flow.frontend_api?.method || "POST";
-                const methodClass =
-                  method === "GET"
-                    ? "badge-get"
-                    : method === "POST"
-                      ? "badge-post"
-                      : method === "DELETE"
-                        ? "badge-delete"
-                        : "badge-put";
+                const method = getFlowMethod(flow);
+                const methodClass = getMethodBadgeClass(method);
+                const routeLocation = flow.route
+                  ? getFileLocationText(flow.route.route_file, flow.route.route_line)
+                  : null;
+                const controllerLocation = flow.controller
+                  ? getFileLocationText(
+                      flow.controller.controller_file,
+                      flow.controller.controller_start_line,
+                    )
+                  : null;
 
                 return (
                   <tr key={flow.id} className="route-row">
@@ -123,14 +128,10 @@ export function RoutesCatalog({
                       </span>
                     </td>
                     <td>
-                      <code className="route-path-cell">
-                        {flow.route?.path || flow.frontend_api?.endpoint || "/"}
-                      </code>
+                      <code className="route-path-cell">{getRoutePath(flow)}</code>
                     </td>
                     <td>
-                      <span className="handler-name">
-                        {flow.route?.handler || flow.name}()
-                      </span>
+                      <span className="handler-name">{getHandlerName(flow)}()</span>
                     </td>
                     <td>
                       {flow.route ? (
@@ -143,7 +144,7 @@ export function RoutesCatalog({
                           title="Open route file"
                         >
                           <span>{flow.route.route_file.split("/").pop()}</span>
-                          <span className="line-tag">:{flow.route.route_line}</span>
+                          <span className="line-tag">:{routeLocation?.split(":").at(-1)}</span>
                           <ExternalLink className="w-3 h-3 ml-1" />
                         </button>
                       ) : (
@@ -166,9 +167,7 @@ export function RoutesCatalog({
                           <span>
                             {flow.controller.controller_file.split("/").pop()}
                           </span>
-                          <span className="line-tag">
-                            :{flow.controller.controller_start_line}
-                          </span>
+                          <span className="line-tag">:{controllerLocation?.split(":").at(-1)}</span>
                           <ExternalLink className="w-3 h-3 ml-1" />
                         </button>
                       ) : (

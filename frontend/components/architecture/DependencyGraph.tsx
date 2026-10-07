@@ -200,9 +200,11 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                   ) : (
                     <div className="edge-list">
                       {outgoingEdges.map((edge, idx) => (
-                        <div
+                        <button
                           key={`out-${edge.target}-${idx}`}
-                          className="edge-item cursor-pointer"
+                          type="button"
+                          className="edge-item"
+                          aria-label={`Open dependency ${edge.target}`}
                           onClick={() => {
                             const targetNode = nodes.find(
                               (n) => n.file === edge.target,
@@ -215,7 +217,7 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                             {edge.target.split("/").pop()}
                           </span>
                           <code className="edge-target-path">{edge.target}</code>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -232,9 +234,11 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                   ) : (
                     <div className="edge-list">
                       {incomingEdges.map((edge, idx) => (
-                        <div
+                        <button
                           key={`in-${edge.source}-${idx}`}
-                          className="edge-item cursor-pointer"
+                          type="button"
+                          className="edge-item"
+                          aria-label={`Open caller ${edge.source}`}
                           onClick={() => {
                             const sourceNode = nodes.find(
                               (n) => n.file === edge.source,
@@ -247,7 +251,7 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                             {edge.source.split("/").pop()}
                           </span>
                           <code className="edge-target-path">{edge.source}</code>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -265,9 +269,11 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                 ) : (
                   <div className="functions-table">
                     {selectedNode.functions.map((fn, idx) => (
-                      <div
+                      <button
                         key={`${fn.name}-${idx}`}
-                        className="fn-row cursor-pointer"
+                        type="button"
+                        className="fn-row"
+                        aria-label={`Open function ${fn.name} in ${selectedNode.file}`}
                         onClick={() => onOpenFile(selectedNode.file, fn.start_line)}
                       >
                         <code className="fn-name">{fn.name}()</code>
@@ -275,7 +281,7 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
                           Lines {fn.start_line} &ndash; {fn.end_line}
                         </span>
                         <ExternalLink className="w-3 h-3 text-muted" />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}

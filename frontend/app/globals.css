@@ -1421,10 +1421,14 @@ a {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: 100%;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
   transition: border-color 140ms ease;
 }
 
@@ -1468,10 +1472,14 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   padding: 8px 10px;
   border-radius: 6px;
   background: var(--surface);
   border: 1px solid var(--line);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .fn-row:hover {

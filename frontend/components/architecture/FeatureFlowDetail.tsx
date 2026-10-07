@@ -11,6 +11,12 @@ import {
   Zap,
 } from "lucide-react";
 import type { FeatureFlow } from "@/types/architecture";
+import {
+  getFileLocationText,
+  getFlowMethod,
+  getMethodBadgeClass,
+  getRoutePath,
+} from "@/lib/architecture";
 
 interface FeatureFlowDetailProps {
   flow: FeatureFlow | null;
@@ -33,15 +39,8 @@ export function FeatureFlowDetail({
     );
   }
 
-  const method = flow.frontend_api?.method || flow.route?.method || "POST";
-  const methodColor =
-    method === "GET"
-      ? "method-badge-get"
-      : method === "POST"
-        ? "method-badge-post"
-        : method === "DELETE"
-          ? "method-badge-delete"
-          : "method-badge-put";
+  const method = getFlowMethod(flow);
+  const methodColor = getMethodBadgeClass(method);
 
   return (
     <div className="flow-detail-container">
@@ -96,7 +95,7 @@ export function FeatureFlowDetail({
                       onOpenFile(flow.frontend_api!.file, flow.frontend_api!.line)
                     }
                   >
-                    <span>{flow.frontend_api.file}:{flow.frontend_api.line}</span>
+                    <span>{getFileLocationText(flow.frontend_api.file, flow.frontend_api.line)}</span>
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </button>
                 </div>
@@ -127,9 +126,7 @@ export function FeatureFlowDetail({
             <div className="step-content">
               <div className="http-spec-box">
                 <span className={`method-badge ${methodColor}`}>{method}</span>
-                <span className="http-route-path">
-                  {flow.route ? flow.route.path : flow.frontend_api?.endpoint || "/"}
-                </span>
+                <span className="http-route-path">{getRoutePath(flow)}</span>
                 {flow.route?.mount_file && (
                   <span className="mount-tag">
                     Mounted in <code>{flow.route.mount_file}</code>
@@ -162,7 +159,7 @@ export function FeatureFlowDetail({
                     className="step-file-link"
                     onClick={() => onOpenFile(flow.route!.route_file, flow.route!.route_line)}
                   >
-                    <span>{flow.route.route_file}:{flow.route.route_line}</span>
+                    <span>{getFileLocationText(flow.route.route_file, flow.route.route_line)}</span>
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </button>
                 </div>
@@ -204,8 +201,11 @@ export function FeatureFlowDetail({
                     }
                   >
                     <span>
-                      {flow.controller.controller_file}:{flow.controller.controller_start_line}-
-                      {flow.controller.controller_end_line}
+                      {getFileLocationText(
+                        flow.controller.controller_file,
+                        flow.controller.controller_start_line,
+                      )}
+                      -{flow.controller.controller_end_line}
                     </span>
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </button>
