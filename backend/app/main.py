@@ -1,200 +1,536 @@
 import sys
+import os
+import logging
 from pathlib import Path
 
+# PATH SETUP
 if __package__ is None or __package__ == "":
     backend_root = Path(__file__).resolve().parent.parent
+
     if str(backend_root) not in sys.path:
         sys.path.insert(0, str(backend_root))
 
-import os
-import logging
+
+# FASTAPI
+
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
-from app.repository_service import RepositoryService
-from app.repository_manager import RepositoryManager
-from app.architecture_service import ArchitectureService
-from app.file_service import FileService
+# LIGHTWEIGHT SERVICES ONLY
 
+from app.repository_manager import RepositoryManager
+
+# APP
 
 app = FastAPI(
     title="CodeLens API",
     description="AI Codebase Intelligence Backend",
     version="1.0.0"
 )
+
 logger = logging.getLogger(__name__)
 
-# Services
-repository_service = RepositoryService()
+# SERVICE STATE
+
+# IMPORTANT:
+# Heavy services are intentionally NOT initialized at startup.
+#
+# They are created only when the corresponding endpoint is used.
+#
+# This keeps Render's 512 MB instance from loading the entire
+# ML/RAG stack during application startup.
+
+repository_service = None
+architecture_service = None
+file_service = None
+
 repository_manager = RepositoryManager()
-architecture_service: ArchitectureService | None = None
-file_service: FileService | None = None
+
+# LAZY SERVICE HELPERS
+
+def get_repository_service():
+    """
+    Create RepositoryService only when repository import
+    is actually requested.
+    """
+
+    global repository_service
+
+    if repository_service is None:
+
+        from app.repository_service import RepositoryService
+
+        repository_service = RepositoryService()
+
+    return repository_service
+
+
+def get_architecture_service(repo_path: str):
+    """
+    Create ArchitectureService only when architecture
+    functionality is requested.
+    """
+
+    global architecture_service
+
+    if (
+        architecture_service is None
+        or getattr(
+            architecture_service,
+            "repository_path",
+            None
+        ) != repo_path
+    ):
+
+        from app.architecture_service import ArchitectureService
+
+        architecture_service = ArchitectureService(
+            repo_path
+        )
+
+    return architecture_service
+
+
+def get_file_service(repo_path: str):
+    """
+    Create FileService only when file functionality
+    is requested.
+    """
+
+    global file_service
+
+    if (
+        file_service is None
+        or getattr(
+            file_service,
+            "repository_path",
+            None
+        ) != repo_path
+    ):
+
+        from app.file_service import FileService
+
+        file_service = FileService(
+            repo_path
+        )
+
+    return file_service
 
 
 def setup_active_services(repo_path: str):
-    global architecture_service, file_service
-    architecture_service = ArchitectureService(repo_path)
-    file_service = FileService(repo_path)
+    """
+    Reset lightweight repository-dependent services.
+
+    Heavy services remain lazy and are created only when
+    their endpoint is accessed.
+    """
+
+    global architecture_service
+    global file_service
+
+    architecture_service = None
+    file_service = None
 
 
-# Restore the previously selected imported repository, if it still exists.
+# ============================================================
+# AUTO LOAD SAVED REPOSITORY
+# ============================================================
+
 def auto_load_saved_repository():
+    """
+    Restore the previously selected repository ONLY when
+    an endpoint explicitly needs it.
+
+    IMPORTANT:
+    This function is NOT called during application startup.
+    """
+
     if repository_manager.is_loaded():
-        return
+        return True
+
+    active_path = (
+        repository_manager.active_repository_path
+    )
+
+    if not active_path:
+        return False
 
     saved_repository = next(
         (
             repository
-            for repository in repository_manager.get_saved_repositories()
-            if repository["repository_path"]
-            == repository_manager.active_repository_path
-            and repository.get("repo_url")
-            and os.path.isdir(repository["repository_path"])
+            for repository
+            in repository_manager.get_saved_repositories()
+
+            if repository.get(
+                "repository_path"
+            ) == active_path
+
+            and repository.get(
+                "repo_url"
+            )
+
+            and os.path.isdir(
+                repository["repository_path"]
+            )
         ),
         None,
     )
-    if saved_repository:
+
+    if not saved_repository:
+
+        # Preserve the saved repository list but don't
+        # automatically activate an unavailable repository.
+
+        if (
+            repository_manager.active_repository_path
+            is not None
+        ):
+
+            repository_manager.active_repository_path = None
+            repository_manager._save_state()
+
+        return False
+
+    try:
+
         repository_manager.set_repository(
-            repository_name=saved_repository["repository"],
-            repository_path=saved_repository["repository_path"],
-            repo_url=saved_repository.get("repo_url"),
-            files=saved_repository.get("files", 0),
-            chunks=saved_repository.get("chunks", 0),
+            repository_name=saved_repository[
+                "repository"
+            ],
+
+            repository_path=saved_repository[
+                "repository_path"
+            ],
+
+            repo_url=saved_repository.get(
+                "repo_url"
+            ),
+
+            files=saved_repository.get(
+                "files",
+                0
+            ),
+
+            chunks=saved_repository.get(
+                "chunks",
+                0
+            ),
         )
-        setup_active_services(saved_repository["repository_path"])
-    elif repository_manager.active_repository_path is not None:
-        # Legacy startup used to auto-select a hard-coded local checkout and
-        # save it without a repository URL. Keep it available in the saved
-        # list, but require an explicit selection rather than restoring it.
-        repository_manager.active_repository_path = None
-        repository_manager._save_state()
+
+        setup_active_services(
+            saved_repository[
+                "repository_path"
+            ]
+        )
+
+        return True
+
+    except Exception:
+
+        logger.exception(
+            "Failed to restore saved repository"
+        )
+
+        return False
 
 
-auto_load_saved_repository()
-
-# Request Models
+# ============================================================
+# REQUEST MODELS
+# ============================================================
 
 class RepositoryImportRequest(BaseModel):
+
     repo_url: str
 
 
 class RepositoryActivationRequest(BaseModel):
+
     repository_path: str
 
 
 class ChatRequest(BaseModel):
+
     question: str
 
 
-# Root
+# ============================================================
+# ROOT
+# ============================================================
 
 @app.get("/")
 def root():
+
     return {
         "name": "CodeLens API",
         "status": "running",
-        "repository": repository_manager.get_repository() if repository_manager.is_loaded() else None
+        "repository": (
+            repository_manager.get_repository()
+            if repository_manager.is_loaded()
+            else None
+        )
     }
 
 
-# Repository Import
+# ============================================================
+# REPOSITORY IMPORT
+# ============================================================
 
 @app.post("/api/repository/import")
-def import_repository(request: RepositoryImportRequest):
+def import_repository(
+    request: RepositoryImportRequest
+):
+
     try:
-        saved_repository = repository_manager.get_repository_by_url(
-            request.repo_url
+
+        # ----------------------------------------------------
+        # First check whether repository already exists
+        # ----------------------------------------------------
+
+        saved_repository = (
+            repository_manager
+            .get_repository_by_url(
+                request.repo_url
+            )
         )
+
         if (
             saved_repository
-            and os.path.isdir(saved_repository["repository_path"])
-        ):
-            repository_manager.set_repository(
-                repository_name=saved_repository["repository"],
-                repository_path=saved_repository["repository_path"],
-                repo_url=saved_repository.get("repo_url"),
-                files=saved_repository.get("files", 0),
-                chunks=saved_repository.get("chunks", 0),
+            and os.path.isdir(
+                saved_repository[
+                    "repository_path"
+                ]
             )
-            setup_active_services(saved_repository["repository_path"])
+        ):
+
+            repository_manager.set_repository(
+
+                repository_name=
+                    saved_repository[
+                        "repository"
+                    ],
+
+                repository_path=
+                    saved_repository[
+                        "repository_path"
+                    ],
+
+                repo_url=
+                    saved_repository.get(
+                        "repo_url"
+                    ),
+
+                files=
+                    saved_repository.get(
+                        "files",
+                        0
+                    ),
+
+                chunks=
+                    saved_repository.get(
+                        "chunks",
+                        0
+                    ),
+            )
+
+            setup_active_services(
+                saved_repository[
+                    "repository_path"
+                ]
+            )
+
             return {
                 **saved_repository,
-                "status": "indexed",
+                "status": "indexed"
             }
 
-        # Clone + load + chunk + embed + store
-        result = repository_service.import_repository(request.repo_url)
+        # ----------------------------------------------------
+        # Lazy-load RepositoryService
+        # ----------------------------------------------------
 
-        # Initialize RAG for this repository
-        repository_manager.set_repository(
-            repository_name=result["repository"],
-            repository_path=result["repository_path"],
-            repo_url=result["repo_url"],
-            files=result["files"],
-            chunks=result["chunks"],
+        service = get_repository_service()
+
+        # ----------------------------------------------------
+        # Clone + load + chunk + embed + store
+        # ----------------------------------------------------
+
+        result = service.import_repository(
+            request.repo_url
         )
 
-        setup_active_services(result["repository_path"])
+        # ----------------------------------------------------
+        # Initialize RAG for this repository
+        # ----------------------------------------------------
+
+        repository_manager.set_repository(
+
+            repository_name=
+                result["repository"],
+
+            repository_path=
+                result["repository_path"],
+
+            repo_url=
+                result["repo_url"],
+
+            files=
+                result["files"],
+
+            chunks=
+                result["chunks"],
+        )
+
+        setup_active_services(
+            result["repository_path"]
+        )
 
         return result
 
     except Exception as error:
-        logger.exception("Repository import failed for %s", request.repo_url)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Repository import failed: {error}",
+
+        logger.exception(
+            "Repository import failed for %s",
+            request.repo_url
         )
 
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Repository import failed: "
+                f"{error}"
+            )
+        )
+
+
+# ============================================================
+# SAVED REPOSITORIES
+# ============================================================
 
 @app.get("/api/repository/saved")
 def get_saved_repositories():
+
     return {
-        "repositories": repository_manager.get_saved_repositories(),
-        "active_repository_path": repository_manager.active_repository_path,
+        "repositories":
+            repository_manager
+            .get_saved_repositories(),
+
+        "active_repository_path":
+            repository_manager
+            .active_repository_path,
     }
 
 
+# ============================================================
+# ACTIVATE REPOSITORY
+# ============================================================
+
 @app.post("/api/repository/activate")
-def activate_repository(request: RepositoryActivationRequest):
+def activate_repository(
+    request: RepositoryActivationRequest
+):
+
     repository = next(
         (
             item
-            for item in repository_manager.get_saved_repositories()
-            if item["repository_path"] == request.repository_path
+            for item
+            in repository_manager
+            .get_saved_repositories()
+
+            if item[
+                "repository_path"
+            ] == request.repository_path
         ),
         None,
     )
-    if repository is None or not os.path.isdir(repository["repository_path"]):
+
+    if (
+        repository is None
+        or not os.path.isdir(
+            repository[
+                "repository_path"
+            ]
+        )
+    ):
+
         raise HTTPException(
             status_code=404,
-            detail="That repository is not available. Import it again.",
+            detail=(
+                "That repository is not "
+                "available. Import it again."
+            )
         )
 
     try:
+
         repository_manager.set_repository(
-            repository_name=repository["repository"],
-            repository_path=repository["repository_path"],
-            repo_url=repository.get("repo_url"),
-            files=repository.get("files", 0),
-            chunks=repository.get("chunks", 0),
+
+            repository_name=
+                repository[
+                    "repository"
+                ],
+
+            repository_path=
+                repository[
+                    "repository_path"
+                ],
+
+            repo_url=
+                repository.get(
+                    "repo_url"
+                ),
+
+            files=
+                repository.get(
+                    "files",
+                    0
+                ),
+
+            chunks=
+                repository.get(
+                    "chunks",
+                    0
+                ),
         )
-        setup_active_services(repository["repository_path"])
+
+        setup_active_services(
+            repository[
+                "repository_path"
+            ]
+        )
+
         return {
             **repository,
             "loaded": True,
         }
+
     except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
+
+        logger.exception(
+            "Repository activation failed"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
 
 
-# Repository Status
+# ============================================================
+# REPOSITORY STATUS
+# ============================================================
 
 @app.get("/api/repository/status")
 def repository_status():
+
+    # Do NOT automatically load on startup.
+    #
+    # If an endpoint asks for status, we can attempt restoration.
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         return {
             "loaded": False,
             "repository": None
@@ -202,83 +538,176 @@ def repository_status():
 
     return {
         "loaded": True,
-        "repository": repository_manager.get_repository(),
-        "repository_path": repository_manager.get_repository_path()
+        "repository":
+            repository_manager.get_repository(),
+
+        "repository_path":
+            repository_manager.get_repository_path()
     }
 
 
+# ============================================================
+# CURRENT REPOSITORY
+# ============================================================
+
 @app.get("/api/repository")
 def get_repository():
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=404,
-            detail="No repository has been imported yet."
+            detail=(
+                "No repository has been "
+                "imported yet."
+            )
         )
 
     return {
-        "repository": repository_manager.get_repository(),
-        "repository_path": repository_manager.get_repository_path(),
+        "repository":
+            repository_manager.get_repository(),
+
+        "repository_path":
+            repository_manager.get_repository_path(),
+
         "loaded": True
     }
 
 
+# ============================================================
+# REPOSITORY SUGGESTIONS
+# ============================================================
+
 @app.get("/api/repository/suggestions")
 def get_repository_suggestions():
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=404,
-            detail="Import a repository before requesting suggestions.",
+            detail=(
+                "Import a repository before "
+                "requesting suggestions."
+            )
         )
 
-    global architecture_service
-    if architecture_service is None:
-        setup_active_services(repository_manager.get_repository_path())
+    architecture = get_architecture_service(
+        repository_manager.get_repository_path()
+    )
 
     suggestions = []
-    for flow in architecture_service.get_feature_flows():
-        frontend_api = flow.get("frontend_api") or {}
-        route = flow.get("route") or {}
-        controller = flow.get("controller") or {}
+
+    # Feature-flow based suggestions
+
+    for flow in architecture.get_feature_flows():
+
+        frontend_api = (
+            flow.get("frontend_api")
+            or {}
+        )
+
+        route = (
+            flow.get("route")
+            or {}
+        )
+
+        controller = (
+            flow.get("controller")
+            or {}
+        )
+
         function_name = (
-            frontend_api.get("function")
-            or flow.get("name")
-            or controller.get("controller_function")
+
+            frontend_api.get(
+                "function"
+            )
+
+            or flow.get(
+                "name"
+            )
+
+            or controller.get(
+                "controller_function"
+            )
         )
+
         endpoint = (
-            route.get("path")
-            or frontend_api.get("resolved_endpoint")
-            or frontend_api.get("endpoint")
+
+            route.get(
+                "path"
+            )
+
+            or frontend_api.get(
+                "resolved_endpoint"
+            )
+
+            or frontend_api.get(
+                "endpoint"
+            )
         )
-        controller_function = controller.get("controller_function")
+
+        controller_function = (
+            controller.get(
+                "controller_function"
+            )
+        )
 
         if function_name and endpoint:
+
             question = (
-                f"How does {function_name} handle {endpoint}"
+                f"How does "
+                f"{function_name} "
+                f"handle "
+                f"{endpoint}"
+
                 f"{f' through {controller_function}' if controller_function else ''}?"
             )
+
         elif function_name:
+
             question = (
-                f"What does {function_name} do in this codebase, "
-                "and what does it depend on?"
+                f"What does "
+                f"{function_name} "
+                f"do in this codebase, "
+                f"and what does it depend on?"
             )
+
         elif endpoint:
-            question = f"Where is {endpoint} handled and what does it do?"
+
+            question = (
+                f"Where is "
+                f"{endpoint} "
+                f"handled and what does it do?"
+            )
+
         else:
+
             continue
 
         if question not in suggestions:
-            suggestions.append(question)
+
+            suggestions.append(
+                question
+            )
+
         if len(suggestions) == 4:
+
             break
 
+    # Fallback file-based suggestions
+
     if not suggestions:
+
         ignored_directories = {
+
             ".git",
             "node_modules",
             "venv",
@@ -287,8 +716,15 @@ def get_repository_suggestions():
             "dist",
             "build",
             ".next",
+            "coverage",
+            ".cache",
+            "out",
+            "target",
+
         }
+
         source_extensions = {
+
             ".py",
             ".js",
             ".jsx",
@@ -297,184 +733,365 @@ def get_repository_suggestions():
             ".java",
             ".go",
             ".rs",
+
         }
+
         source_files = []
-        repository_path = repository_manager.get_repository_path()
-        for root, directories, filenames in os.walk(repository_path):
+
+        repository_path = (
+            repository_manager
+            .get_repository_path()
+        )
+
+        for root, directories, filenames in os.walk(
+            repository_path
+        ):
+
             directories[:] = [
+
                 directory
-                for directory in directories
-                if directory not in ignored_directories
+                for directory
+                in directories
+
+                if directory
+                not in ignored_directories
+
             ]
+
             for filename in filenames:
-                if os.path.splitext(filename)[1].lower() in source_extensions:
+
+                if (
+                    os.path.splitext(
+                        filename
+                    )[1].lower()
+                    in source_extensions
+                ):
+
                     source_files.append(
+
                         os.path.relpath(
-                            os.path.join(root, filename),
+
+                            os.path.join(
+                                root,
+                                filename
+                            ),
+
                             repository_path,
-                        ).replace(os.sep, "/")
+
+                        ).replace(
+                            os.sep,
+                            "/"
+                        )
                     )
+
             if len(source_files) >= 4:
+
                 break
 
         suggestions = [
-            f"What is the role of {file_path} in this codebase?"
-            for file_path in source_files[:4]
+
+            f"What is the role of "
+            f"{file_path} "
+            f"in this codebase?"
+
+            for file_path
+            in source_files[:4]
+
         ]
 
     return {
-        "repository": repository_manager.get_repository(),
-        "suggestions": suggestions,
+        "repository":
+            repository_manager.get_repository(),
+
+        "suggestions":
+            suggestions,
     }
 
-
-# =========================
-# Chat
-# =========================
-
+# CHAT
 @app.post("/api/chat")
-def chat(request: ChatRequest):
+def chat(
+    request: ChatRequest
+):
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=400,
-            detail="No repository has been imported yet."
+            detail=(
+                "No repository has been "
+                "imported yet."
+            )
         )
 
     if not request.question.strip():
+
         raise HTTPException(
             status_code=400,
             detail="Question cannot be empty."
         )
 
     try:
-        rag_pipeline = repository_manager.get_rag_pipeline()
-        result = rag_pipeline.answer(request.question)
+
+        rag_pipeline = (
+            repository_manager
+            .get_rag_pipeline()
+        )
+
+        result = rag_pipeline.answer(
+            request.question
+        )
 
         return {
-            "repository": repository_manager.get_repository(),
-            "question": request.question,
-            "answer": result["answer"],
-            "sources": result["sources"]
+            "repository":
+                repository_manager
+                .get_repository(),
+
+            "question":
+                request.question,
+
+            "answer":
+                result["answer"],
+
+            "sources":
+                result["sources"]
         }
 
     except Exception as error:
+
+        logger.exception(
+            "Chat request failed"
+        )
+
         raise HTTPException(
             status_code=500,
             detail=str(error)
         )
 
 
-# =========================
-# Architecture
-# =========================
+# ARCHITECTURE - FLOWS
 
 @app.get("/api/architecture/flows")
 def get_architecture_flows():
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=404,
-            detail="No repository has been imported yet."
+            detail=(
+                "No repository has been "
+                "imported yet."
+            )
         )
 
-    global architecture_service
-    if architecture_service is None:
-        setup_active_services(repository_manager.get_repository_path())
+    architecture = get_architecture_service(
+        repository_manager.get_repository_path()
+    )
 
     try:
-        flows = architecture_service.get_feature_flows()
-        return {
-            "repository": repository_manager.get_repository(),
-            "flows": flows,
-            "total": len(flows)
-        }
-    except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
 
+        flows = (
+            architecture
+            .get_feature_flows()
+        )
+
+        return {
+            "repository":
+                repository_manager
+                .get_repository(),
+
+            "flows":
+                flows,
+
+            "total":
+                len(flows)
+        }
+
+    except Exception as error:
+
+        logger.exception(
+            "Architecture flow request failed"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
+
+
+# ============================================================
+# ARCHITECTURE - GRAPH
+# ============================================================
 
 @app.get("/api/architecture/graph")
 def get_architecture_graph():
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=404,
-            detail="No repository has been imported yet."
+            detail=(
+                "No repository has been "
+                "imported yet."
+            )
         )
 
-    global architecture_service
-    if architecture_service is None:
-        setup_active_services(repository_manager.get_repository_path())
+    architecture = get_architecture_service(
+        repository_manager.get_repository_path()
+    )
 
     try:
-        graph = architecture_service.get_code_graph()
+
+        graph = (
+            architecture
+            .get_code_graph()
+        )
+
         return {
-            "repository": repository_manager.get_repository(),
+            "repository":
+                repository_manager
+                .get_repository(),
+
             **graph
         }
+
     except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
 
+        logger.exception(
+            "Architecture graph request failed"
+        )
 
-# =========================
-# Files
-# =========================
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
+
+# FILE TREE
 
 @app.get("/api/files/tree")
 def get_file_tree():
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=404,
-            detail="No repository has been imported yet."
+            detail=(
+                "No repository has been "
+                "imported yet."
+            )
         )
 
-    global file_service
-    if file_service is None:
-        setup_active_services(repository_manager.get_repository_path())
+    service = get_file_service(
+        repository_manager.get_repository_path()
+    )
 
     try:
-        tree = file_service.get_file_tree()
-        return {
-            "repository": repository_manager.get_repository(),
-            "tree": tree
-        }
-    except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
 
+        tree = service.get_file_tree()
+
+        return {
+            "repository":
+                repository_manager
+                .get_repository(),
+
+            "tree":
+                tree
+        }
+
+    except Exception as error:
+
+        logger.exception(
+            "File tree request failed"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
+
+# FILE CONTENT
 
 @app.get("/api/files/content")
-def get_file_content(path: str = Query(..., description="Relative path to file in repository")):
+def get_file_content(
+    path: str = Query(
+        ...,
+        description=(
+            "Relative path to file "
+            "in repository"
+        )
+    )
+):
+
     if not repository_manager.is_loaded():
+
         auto_load_saved_repository()
 
     if not repository_manager.is_loaded():
+
         raise HTTPException(
             status_code=404,
-            detail="No repository has been imported yet."
+            detail=(
+                "No repository has been "
+                "imported yet."
+            )
         )
 
-    global file_service
-    if file_service is None:
-        setup_active_services(repository_manager.get_repository_path())
+    service = get_file_service(
+        repository_manager.get_repository_path()
+    )
 
     try:
-        content_data = file_service.get_file_content(path)
+
+        content_data = (
+            service.get_file_content(
+                path
+            )
+        )
+
         return {
-            "repository": repository_manager.get_repository(),
+            "repository":
+                repository_manager
+                .get_repository(),
+
             **content_data
         }
-    except FileNotFoundError as fnf:
-        raise HTTPException(status_code=404, detail=str(fnf))
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
+
+    except FileNotFoundError as error:
+
+        raise HTTPException(
+            status_code=404,
+            detail=str(error)
+        )
+
+    except ValueError as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
+
     except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error))
+
+        logger.exception(
+            "File content request failed"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
