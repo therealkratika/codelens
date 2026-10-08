@@ -8,7 +8,7 @@ from app.ingestion.chunker import iter_document_chunks
 from app.rag.embeddings import EmbeddingModel
 from app.rag.vector_store import VectorStore
 
-INDEX_BATCH_SIZE = 8
+INDEX_BATCH_SIZE = 64
 
 
 class RepositoryService:
@@ -60,7 +60,7 @@ class RepositoryService:
         vector_store.clear()
         chunk_count = 0
 
-        # Embed and persist bounded batches to keep indexing memory usage low.
+        # Larger bounded batches reduce inference and ChromaDB write overhead.
         try:
             while batch:
                 texts = [chunk["content"] for chunk in batch]
@@ -76,7 +76,6 @@ class RepositoryService:
                     del texts
                     del embeddings
                     del batch
-                    gc.collect()
                 batch = list(islice(chunks, INDEX_BATCH_SIZE))
         finally:
             self.embedding_model.model = None

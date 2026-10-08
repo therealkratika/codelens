@@ -28,6 +28,7 @@ export function FilesView({
     targetLine,
     totalFileCount,
     isLoadingContent,
+    error,
   } = useFiles(initialFilePath);
 
   return (
@@ -46,6 +47,12 @@ export function FilesView({
           <span>{totalFileCount} Indexed Files</span>
         </div>
       </div>
+
+      {error && (
+        <div className="error-message" role="alert">
+          <p>{error}</p>
+        </div>
+      )}
 
       <div className="files-split-pane">
         {/* Left Tree Explorer */}

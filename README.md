@@ -118,7 +118,7 @@ The import screen currently accepts GitHub repository URLs. Private repositories
 - Supported indexed file extensions are Python, JavaScript, JSX, TypeScript, TSX, Java, C/C++, HTML, CSS/SCSS, JSON, and Markdown.
 - Dependency/build output directories such as `.git`, `node_modules`, `.venv`, `dist`, and `.next` are excluded.
 - Repository text is chunked and embedded locally with `all-MiniLM-L6-v2`.
-- Chunks are embedded and written to ChromaDB in batches of 256.
+- Imports use a shallow Git clone and stream source files into bounded embedding batches, then write batches of up to 64 chunks to ChromaDB.
 - Repository vector collections are separated by checkout path.
 - Chat retrieval combines vector search, BM25 keyword search, and reranking before sending relevant context to Gemini.
 - JavaScript/TypeScript AST parsing and flow detection are heuristic and may not recognize every framework, language, or coding style.

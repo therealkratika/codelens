@@ -70,8 +70,8 @@ export function DependencyGraph({ graph, onOpenFile }: DependencyGraphProps) {
     return (
       <div className="graph-empty-state">
         <Network className="w-12 h-12 text-muted mb-3" />
-        <h3>Code Graph Initializing</h3>
-        <p>Analyzing import statements and function invocations across codebase...</p>
+        <h3>No dependency graph data is available</h3>
+        <p>No graphable source files were found in this repository.</p>
       </div>
     );
   }

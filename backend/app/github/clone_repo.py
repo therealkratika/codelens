@@ -18,7 +18,11 @@ def clone_repository(repo_url: str, repo_name: str):
 
     print(f"Cloning repository: {repo_url}")
 
-    Repo.clone_from(repo_url, str(repo_path))
+    Repo.clone_from(
+        repo_url,
+        str(repo_path),
+        multi_options=["--depth=1"],
+    )
 
     print(f"Repository cloned to: {repo_path}")
 

@@ -39,7 +39,11 @@ export function FeatureFlowList({
       <div className="flow-list-items">
         {flows.length === 0 ? (
           <div className="flow-list-empty">
-            <p>No feature flows matching &ldquo;{searchQuery}&rdquo;</p>
+            <p>
+              {searchQuery
+                ? `No feature flows matching "${searchQuery}"`
+                : "No feature flows were detected in this repository."}
+            </p>
           </div>
         ) : (
           flows.map((flow) => {
