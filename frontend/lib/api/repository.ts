@@ -27,6 +27,7 @@ async function startAndWaitForRepositoryImport(
   >("/repository/import", request);
   const deadline = Date.now() + 30 * 60 * 1000;
   let consecutivePollFailures = 0;
+  let recoveredMissingJob = false;
 
   while (true) {
     if (job.status === "completed") {
@@ -47,9 +48,19 @@ async function startAndWaitForRepositoryImport(
       consecutivePollFailures = 0;
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
+        if (!recoveredMissingJob && Date.now() < deadline) {
+          recoveredMissingJob = true;
+          job = await apiClient.post<
+            RepositoryImportJob,
+            RepositoryImportRequest
+          >("/repository/import", request);
+          consecutivePollFailures = 0;
+          continue;
+        }
+
         throw new ApiError(
           error.status,
-          "The import job is no longer available. The backend may have restarted; please start the import again.",
+          "The import job was lost again after the backend restarted. Please try importing when the backend is stable.",
         );
       }
 
