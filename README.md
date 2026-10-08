@@ -84,6 +84,8 @@ npm run dev
 
 Open `http://localhost:3000`. Keep the backend running while using the frontend. Restart the Next.js development server after changing `.env.local`.
 
+The deployed frontend defaults to the CodeLens Render backend at `https://codelens-fbcl.onrender.com`. Set `NEXT_PUBLIC_API_URL` in the Vercel project environment to override that backend URL; use the backend root without an `/api` suffix.
+
 ## Using CodeLens
 
 1. Open the frontend and enter a public GitHub repository URL, such as `https://github.com/owner/repository`.
