@@ -1,6 +1,8 @@
 import sys
 import os
 import logging
+from threading import Lock
+from uuid import uuid4
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 # PATH SETUP
@@ -13,7 +15,7 @@ if __package__ is None or __package__ == "":
 
 # FASTAPI
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 # LIGHTWEIGHT SERVICES ONLY
@@ -46,6 +48,8 @@ logger = logging.getLogger(__name__)
 repository_service = None
 architecture_service = None
 file_service = None
+repository_import_lock = Lock()
+repository_import_jobs = {}
 
 repository_manager = RepositoryManager()
 
@@ -278,130 +282,99 @@ def root():
 # REPOSITORY IMPORT
 # ============================================================
 
-@app.post("/api/repository/import")
-def import_repository(
-    request: RepositoryImportRequest
-):
+def perform_repository_import(repo_url: str):
+
+    saved_repository = (
+        repository_manager
+        .get_repository_by_url(repo_url)
+    )
+
+    if (
+        saved_repository
+        and os.path.isdir(saved_repository["repository_path"])
+    ):
+        repository_manager.set_repository(
+            repository_name=saved_repository["repository"],
+            repository_path=saved_repository["repository_path"],
+            repo_url=saved_repository.get("repo_url"),
+            files=saved_repository.get("files", 0),
+            chunks=saved_repository.get("chunks", 0),
+        )
+        setup_active_services(saved_repository["repository_path"])
+        return {**saved_repository, "status": "indexed"}
+
+    service = get_repository_service()
+    result = service.import_repository(repo_url)
+
+    repository_manager.set_repository(
+        repository_name=result["repository"],
+        repository_path=result["repository_path"],
+        repo_url=result["repo_url"],
+        files=result["files"],
+        chunks=result["chunks"],
+    )
+    setup_active_services(result["repository_path"])
+    return result
+
+
+def run_repository_import(job_id: str, repo_url: str):
+
+    repository_import_jobs[job_id]["status"] = "running"
 
     try:
-
-        # ----------------------------------------------------
-        # First check whether repository already exists
-        # ----------------------------------------------------
-
-        saved_repository = (
-            repository_manager
-            .get_repository_by_url(
-                request.repo_url
-            )
+        repository_import_jobs[job_id]["result"] = (
+            perform_repository_import(repo_url)
         )
-
-        if (
-            saved_repository
-            and os.path.isdir(
-                saved_repository[
-                    "repository_path"
-                ]
-            )
-        ):
-
-            repository_manager.set_repository(
-
-                repository_name=
-                    saved_repository[
-                        "repository"
-                    ],
-
-                repository_path=
-                    saved_repository[
-                        "repository_path"
-                    ],
-
-                repo_url=
-                    saved_repository.get(
-                        "repo_url"
-                    ),
-
-                files=
-                    saved_repository.get(
-                        "files",
-                        0
-                    ),
-
-                chunks=
-                    saved_repository.get(
-                        "chunks",
-                        0
-                    ),
-            )
-
-            setup_active_services(
-                saved_repository[
-                    "repository_path"
-                ]
-            )
-
-            return {
-                **saved_repository,
-                "status": "indexed"
-            }
-
-        # ----------------------------------------------------
-        # Lazy-load RepositoryService
-        # ----------------------------------------------------
-
-        service = get_repository_service()
-
-        # ----------------------------------------------------
-        # Clone + load + chunk + embed + store
-        # ----------------------------------------------------
-
-        result = service.import_repository(
-            request.repo_url
-        )
-
-        # ----------------------------------------------------
-        # Initialize RAG for this repository
-        # ----------------------------------------------------
-
-        repository_manager.set_repository(
-
-            repository_name=
-                result["repository"],
-
-            repository_path=
-                result["repository_path"],
-
-            repo_url=
-                result["repo_url"],
-
-            files=
-                result["files"],
-
-            chunks=
-                result["chunks"],
-        )
-
-        setup_active_services(
-            result["repository_path"]
-        )
-
-        return result
-
+        repository_import_jobs[job_id]["status"] = "completed"
     except Exception as error:
-
         logger.exception(
             "Repository import failed for %s",
-            request.repo_url
+            repo_url
+        )
+        repository_import_jobs[job_id]["error"] = (
+            f"Repository import failed: {error}"
+        )
+        repository_import_jobs[job_id]["status"] = "failed"
+    finally:
+        repository_import_lock.release()
+
+
+@app.post("/api/repository/import", status_code=202)
+def import_repository(
+    request: RepositoryImportRequest,
+    background_tasks: BackgroundTasks,
+):
+    if not repository_import_lock.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409,
+            detail="Another repository import is already in progress.",
         )
 
+    job_id = str(uuid4())
+    repository_import_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "result": None,
+        "error": None,
+    }
+
+    background_tasks.add_task(
+        run_repository_import,
+        job_id,
+        request.repo_url,
+    )
+    return {**repository_import_jobs[job_id]}
+
+
+@app.get("/api/repository/import/{job_id}")
+def get_repository_import_status(job_id: str):
+    job = repository_import_jobs.get(job_id)
+    if job is None:
         raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Repository import failed: "
-                f"{error}"
-            )
+            status_code=404,
+            detail="Repository import job was not found.",
         )
+    return job
 
 
 # ============================================================

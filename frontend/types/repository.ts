@@ -11,6 +11,26 @@ export interface RepositoryImportResponse {
   status: "indexed";
 }
 
+export type RepositoryImportJob =
+  | {
+      job_id: string;
+      status: "queued" | "running";
+      result: null;
+      error: null;
+    }
+  | {
+      job_id: string;
+      status: "completed";
+      result: RepositoryImportResponse;
+      error: null;
+    }
+  | {
+      job_id: string;
+      status: "failed";
+      result: null;
+      error: string;
+    };
+
 export type RepositoryStatus =
   | {
       loaded: false;

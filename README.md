@@ -100,7 +100,8 @@ The import screen currently accepts GitHub repository URLs. Private repositories
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/` | Backend status |
-| `POST` | `/api/repository/import` | Clone or reactivate and index a GitHub repository |
+| `POST` | `/api/repository/import` | Start a background import and return a job ID |
+| `GET` | `/api/repository/import/{job_id}` | Poll an import job until it completes or fails |
 | `GET` | `/api/repository/status` | Active repository status |
 | `GET` | `/api/repository` | Active repository details |
 | `GET` | `/api/repository/saved` | List saved repositories |
@@ -142,6 +143,7 @@ Increasing the API quota or enabling billing may incur charges. Review Google's 
 - Confirm the backend is running at the URL in `frontend/.env.local`.
 - Ensure `NEXT_PUBLIC_API_URL` has no `/api` suffix; Next.js adds the `/api/...` route.
 - Restart the frontend after changing `.env.local`.
+- Repository imports run as backend jobs so a deployment proxy does not have to hold the connection open while cloning and indexing. If an import fails, the job status response contains the backend error.
 
 ### Repository import fails
 

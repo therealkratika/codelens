@@ -1,6 +1,7 @@
-import { apiClient } from "@/lib/api/client";
+import { ApiError, ApiTimeoutError, apiClient } from "@/lib/api/client";
 import type {
   RepositoryDetails,
+  RepositoryImportJob,
   RepositoryImportRequest,
   RepositoryImportResponse,
   RepositorySuggestionsResponse,
@@ -11,12 +12,35 @@ import type {
 export function importRepository(
   repoUrl: string,
 ): Promise<RepositoryImportResponse> {
+  return startAndWaitForRepositoryImport(repoUrl);
+}
+
+async function startAndWaitForRepositoryImport(
+  repoUrl: string,
+): Promise<RepositoryImportResponse> {
   const request: RepositoryImportRequest = { repo_url: repoUrl };
-  return apiClient.post<RepositoryImportResponse, RepositoryImportRequest>(
-    "/repository/import",
-    request,
-    600_000,
-  );
+  let job = await apiClient.post<
+    RepositoryImportJob,
+    RepositoryImportRequest
+  >("/repository/import", request);
+  const deadline = Date.now() + 30 * 60 * 1000;
+
+  while (true) {
+    if (job.status === "completed") {
+      return job.result;
+    }
+    if (job.status === "failed") {
+      throw new ApiError(500, job.error);
+    }
+    if (Date.now() >= deadline) {
+      throw new ApiTimeoutError();
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+    job = await apiClient.get<RepositoryImportJob>(
+      `/repository/import/${encodeURIComponent(job.job_id)}`,
+    );
+  }
 }
 
 export function getRepositoryStatus(): Promise<RepositoryStatus> {
