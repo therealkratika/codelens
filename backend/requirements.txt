@@ -1,6 +1,7 @@
 GitPython
 chromadb
-sentence-transformers
+fastembed
+numpy
 google-genai
 httpx
 python-dotenv

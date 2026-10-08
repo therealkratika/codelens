@@ -1,47 +1,51 @@
-from sentence_transformers import SentenceTransformer
+import numpy as np
+from fastembed import TextEmbedding
 
 ENCODE_BATCH_SIZE = 8
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 class EmbeddingModel:
 
     def __init__(self):
 
-        self.model = None
+        self.model: TextEmbedding | None = None
 
         print("Embedding model initialized lazily.")
 
     def _load_model(self):
-
         if self.model is None:
-
-            print("Loading embedding model...")
-
-            self.model = SentenceTransformer(
-                "all-MiniLM-L6-v2"
-            )
-
-            print("Embedding model loaded!")
+            print(f"Loading ONNX embedding model: {MODEL_NAME}")
+            self.model = TextEmbedding(MODEL_NAME, threads=1)
+            print("ONNX embedding model loaded.")
 
     def generate_embeddings(self, texts):
-
         if not texts:
-            return []
+            return np.empty((0, 384), dtype=np.float32)
 
         self._load_model()
-
-        return self.model.encode(
-            texts,
-            show_progress_bar=True,
-            batch_size=ENCODE_BATCH_SIZE,
-            convert_to_numpy=True
+        if self.model is None:
+            raise RuntimeError("Embedding model failed to initialize.")
+        return np.asarray(
+            list(
+                self.model.embed(
+                    texts,
+                    batch_size=ENCODE_BATCH_SIZE,
+                    parallel=0,
+                )
+            ),
+            dtype=np.float32,
         )
 
     def generate_query_embedding(self, query):
-
         self._load_model()
-
-        return self.model.encode(
-            [query],
-            convert_to_numpy=True
-        )[0]
+        if self.model is None:
+            raise RuntimeError("Embedding model failed to initialize.")
+        return next(
+            iter(
+                self.model.query_embed(
+                    query,
+                    parallel=0,
+                )
+            )
+        )
