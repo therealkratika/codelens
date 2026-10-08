@@ -1,3 +1,5 @@
+import gc
+
 from app.github.clone_repo import clone_repository
 from app.ingestion.loader import load_files
 from app.ingestion.chunker import chunk_documents
@@ -5,7 +7,7 @@ from app.ingestion.chunker import chunk_documents
 from app.rag.embeddings import EmbeddingModel
 from app.rag.vector_store import VectorStore
 
-INDEX_BATCH_SIZE = 256
+INDEX_BATCH_SIZE = 32
 
 
 class RepositoryService:
@@ -56,15 +58,25 @@ class RepositoryService:
 
         # Embed and persist bounded batches to avoid exhausting memory or
         # exceeding ChromaDB's per-request batch limit on larger repositories.
-        for start in range(0, len(chunks), INDEX_BATCH_SIZE):
-            batch = chunks[start : start + INDEX_BATCH_SIZE]
-            texts = [chunk["content"] for chunk in batch]
-            embeddings = self.embedding_model.generate_embeddings(texts)
-            vector_store.add_documents(
-                batch,
-                embeddings,
-                start_index=start,
-            )
+        try:
+            for start in range(0, len(chunks), INDEX_BATCH_SIZE):
+                batch = chunks[start : start + INDEX_BATCH_SIZE]
+                texts = [chunk["content"] for chunk in batch]
+                embeddings = self.embedding_model.generate_embeddings(texts)
+                try:
+                    vector_store.add_documents(
+                        batch,
+                        embeddings,
+                        start_index=start,
+                    )
+                finally:
+                    del texts
+                    del embeddings
+                    del batch
+                    gc.collect()
+        finally:
+            self.embedding_model.model = None
+            gc.collect()
 
         return {
             "repository": repo_name,
