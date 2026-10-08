@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterable, Iterator
 
 # Detect important code structures
 
@@ -268,9 +269,9 @@ def chunk_document(
 # Chunk complete repository
 # ---------------------------------------------------------
 
-def chunk_documents(documents):
-
-    all_chunks = []
+def iter_document_chunks(
+    documents: Iterable[dict[str, str]],
+) -> Iterator[dict]:
 
     for document in documents:
 
@@ -301,6 +302,8 @@ def chunk_documents(documents):
                 document
             )
 
-        all_chunks.extend(chunks)
+        yield from chunks
 
-    return all_chunks
+
+def chunk_documents(documents):
+    return list(iter_document_chunks(documents))

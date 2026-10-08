@@ -15,6 +15,8 @@ export function importRepository(
   return startAndWaitForRepositoryImport(repoUrl);
 }
 
+const RETRYABLE_IMPORT_STATUSES = new Set([502, 503, 504]);
+
 async function startAndWaitForRepositoryImport(
   repoUrl: string,
 ): Promise<RepositoryImportResponse> {
@@ -24,6 +26,7 @@ async function startAndWaitForRepositoryImport(
     RepositoryImportRequest
   >("/repository/import", request);
   const deadline = Date.now() + 30 * 60 * 1000;
+  let consecutivePollFailures = 0;
 
   while (true) {
     if (job.status === "completed") {
@@ -37,9 +40,31 @@ async function startAndWaitForRepositoryImport(
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, 2_000));
-    job = await apiClient.get<RepositoryImportJob>(
-      `/repository/import/${encodeURIComponent(job.job_id)}`,
-    );
+    try {
+      job = await apiClient.get<RepositoryImportJob>(
+        `/repository/import/${encodeURIComponent(job.job_id)}`,
+      );
+      consecutivePollFailures = 0;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        throw new ApiError(
+          error.status,
+          "The import job is no longer available. The backend may have restarted; please start the import again.",
+        );
+      }
+
+      if (
+        !(error instanceof ApiError) ||
+        !RETRYABLE_IMPORT_STATUSES.has(error.status) ||
+        consecutivePollFailures >= 6
+      ) {
+        throw error;
+      }
+
+      consecutivePollFailures += 1;
+      const retryDelay = Math.min(2 ** consecutivePollFailures * 1_000, 8_000);
+      await new Promise((resolve) => window.setTimeout(resolve, retryDelay));
+    }
   }
 }
 

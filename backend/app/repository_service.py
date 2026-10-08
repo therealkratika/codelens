@@ -1,13 +1,14 @@
 import gc
+from itertools import islice
 
 from app.github.clone_repo import clone_repository
-from app.ingestion.loader import load_files
-from app.ingestion.chunker import chunk_documents
+from app.ingestion.loader import iter_files
+from app.ingestion.chunker import iter_document_chunks
 
 from app.rag.embeddings import EmbeddingModel
 from app.rag.vector_store import VectorStore
 
-INDEX_BATCH_SIZE = 32
+INDEX_BATCH_SIZE = 8
 
 
 class RepositoryService:
@@ -37,17 +38,19 @@ class RepositoryService:
 
         vector_store = VectorStore(repo_path)
 
-        # 2. Load files
-        documents = load_files(
-            repo_path
-        )
+        # Stream files and chunks so indexing does not retain multiple
+        # repository-wide copies of source text in memory.
+        file_count = 0
 
-        # 3. Create chunks
-        chunks = chunk_documents(
-            documents
-        )
+        def counted_files():
+            nonlocal file_count
+            for document in iter_files(repo_path):
+                file_count += 1
+                yield document
 
-        if not chunks:
+        chunks = iter_document_chunks(counted_files())
+        batch = list(islice(chunks, INDEX_BATCH_SIZE))
+        if not batch:
             raise ValueError(
                 "No supported source files were found in this repository. "
                 "CodeLens currently indexes Python, JavaScript, TypeScript, "
@@ -55,25 +58,26 @@ class RepositoryService:
             )
 
         vector_store.clear()
+        chunk_count = 0
 
-        # Embed and persist bounded batches to avoid exhausting memory or
-        # exceeding ChromaDB's per-request batch limit on larger repositories.
+        # Embed and persist bounded batches to keep indexing memory usage low.
         try:
-            for start in range(0, len(chunks), INDEX_BATCH_SIZE):
-                batch = chunks[start : start + INDEX_BATCH_SIZE]
+            while batch:
                 texts = [chunk["content"] for chunk in batch]
                 embeddings = self.embedding_model.generate_embeddings(texts)
                 try:
                     vector_store.add_documents(
                         batch,
                         embeddings,
-                        start_index=start,
+                        start_index=chunk_count,
                     )
+                    chunk_count += len(batch)
                 finally:
                     del texts
                     del embeddings
                     del batch
                     gc.collect()
+                batch = list(islice(chunks, INDEX_BATCH_SIZE))
         finally:
             self.embedding_model.model = None
             gc.collect()
@@ -82,7 +86,7 @@ class RepositoryService:
             "repository": repo_name,
             "repository_path": repo_path,
             "repo_url": repo_url,
-            "files": len(documents),
-            "chunks": len(chunks),
+            "files": file_count,
+            "chunks": chunk_count,
             "status": "indexed"
         }

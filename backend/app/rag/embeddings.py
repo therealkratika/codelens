@@ -1,5 +1,7 @@
 from sentence_transformers import SentenceTransformer
 
+ENCODE_BATCH_SIZE = 8
+
 
 class EmbeddingModel:
 
@@ -31,7 +33,7 @@ class EmbeddingModel:
         return self.model.encode(
             texts,
             show_progress_bar=True,
-            batch_size=32,
+            batch_size=ENCODE_BATCH_SIZE,
             convert_to_numpy=True
         )
 

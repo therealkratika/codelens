@@ -1,4 +1,5 @@
 import os
+from collections.abc import Iterator
 
 
 # File types that CodeLens should index
@@ -48,9 +49,7 @@ IGNORED_FILES = {
 }
 
 
-def load_files(repo_path: str):
-
-    documents = []
+def iter_files(repo_path: str) -> Iterator[dict[str, str]]:
 
     for root, dirs, files in os.walk(repo_path):
 
@@ -97,10 +96,10 @@ def load_files(repo_path: str):
                     repo_path
                 )
 
-                documents.append({
+                yield {
                     "file": relative_path,
                     "content": content
-                })
+                }
 
             except Exception as e:
 
@@ -108,4 +107,5 @@ def load_files(repo_path: str):
                     f"Could not read {file_path}: {e}"
                 )
 
-    return documents
+def load_files(repo_path: str):
+    return list(iter_files(repo_path))
