@@ -26,12 +26,13 @@ class EmbeddingModel:
         self._load_model()
         if self.model is None:
             raise RuntimeError("Embedding model failed to initialize.")
+        # FastEmbed parallel=0 starts workers on every core; keep inference
+        # in-process instead.
         return np.asarray(
             list(
                 self.model.embed(
                     texts,
                     batch_size=ENCODE_BATCH_SIZE,
-                    parallel=0,
                 )
             ),
             dtype=np.float32,
@@ -45,7 +46,6 @@ class EmbeddingModel:
             iter(
                 self.model.query_embed(
                     query,
-                    parallel=0,
                 )
             )
         )
