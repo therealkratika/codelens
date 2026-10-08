@@ -6,6 +6,12 @@ from app.rag.retriever import Retriever
 
 
 class EmptyCorpusRetrieverTests(unittest.TestCase):
+    def test_tokenize_replaces_existing_punctuation_in_one_pass(self):
+        self.assertEqual(
+            Retriever.tokenize('Foo(bar){baz}[qux];,.:/\\ "it\'s"'),
+            ["foo", "bar", "baz", "qux", "it", "s"],
+        )
+
     def test_empty_collection_initializes_and_returns_no_keyword_results(self):
         vector_store = Mock()
         vector_store.collection.get.return_value = {
@@ -51,6 +57,33 @@ class EmptyCorpusRetrieverTests(unittest.TestCase):
 
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0]["document"], "alpha function")
+
+    def test_keyword_search_returns_stable_top_k_without_sorting_every_hit(self):
+        retriever = Retriever.__new__(Retriever)
+        retriever.documents = ["first", "second", "third", "fourth"]
+        retriever.metadatas = [{"file": name} for name in retriever.documents]
+        retriever.bm25 = Mock()
+        retriever.bm25.get_scores.return_value = [1.0, 3.0, 3.0, 2.0]
+
+        results = retriever.keyword_search("query", top_k=2)
+
+        self.assertEqual(
+            [result["document"] for result in results],
+            ["second", "third"],
+        )
+        self.assertEqual(
+            [result["bm25_score"] for result in results],
+            [3.0, 3.0],
+        )
+
+        negative_limit_results = retriever.keyword_search(
+            "query",
+            top_k=-1,
+        )
+        self.assertEqual(
+            [result["document"] for result in negative_limit_results],
+            ["second", "third", "fourth"],
+        )
 
 
 if __name__ == "__main__":

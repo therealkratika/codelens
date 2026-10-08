@@ -1,3 +1,6 @@
+import heapq
+import os
+
 from rank_bm25 import BM25Okapi
 
 from app.rag.code_tracer import CodeTracer
@@ -8,30 +11,47 @@ from app.rag.reranker import Reranker
 
 class Retriever:
 
+    _TOKEN_TRANSLATION = str.maketrans({
+        character: " "
+        for character in "(){}[];,.:/\\\"'"
+    })
+
     def __init__(self, repository_path=None):
 
         print("Initializing retriever...")
-
-        # --------------------------------
         # Embedding model
-        # --------------------------------
-
         self.embedding_model = EmbeddingModel()
-
-        # --------------------------------
         # Vector store
-        # --------------------------------
 
-        self.vector_store = VectorStore(repository_path)
-
-        # --------------------------------
+        self.vector_store = VectorStore(
+            repository_path
+        )
         # Reranker
-        # --------------------------------
+        self.enable_reranker = (
+            os.getenv(
+                "CODELENS_ENABLE_RERANKER",
+                "true"
+            ).lower()
+            == "true"
+        )
 
-        self.reranker = Reranker()
+        if self.enable_reranker:
+
+            print("Reranker enabled.")
+
+            self.reranker = Reranker()
+
+        else:
+
+            print(
+                "Reranker disabled "
+                "(CODELENS_ENABLE_RERANKER=false)."
+            )
+
+            self.reranker = None
 
         # --------------------------------
-        # Load all indexed chunks
+        # Load indexed chunks
         # --------------------------------
 
         data = self.vector_store.collection.get(
@@ -43,6 +63,7 @@ class Retriever:
 
         self.documents = data["documents"]
         self.metadatas = data["metadatas"]
+
         self.code_tracer = CodeTracer(
             self.documents,
             self.metadatas
@@ -75,24 +96,9 @@ class Retriever:
     @staticmethod
     def tokenize(text):
 
-        return (
-            text.lower()
-            .replace("(", " ")
-            .replace(")", " ")
-            .replace("{", " ")
-            .replace("}", " ")
-            .replace("[", " ")
-            .replace("]", " ")
-            .replace(";", " ")
-            .replace(",", " ")
-            .replace(".", " ")
-            .replace(":", " ")
-            .replace("/", " ")
-            .replace("\\", " ")
-            .replace('"', " ")
-            .replace("'", " ")
-            .split()
-        )
+        return text.lower().translate(
+            Retriever._TOKEN_TRANSLATION
+        ).split()
 
     # =================================================
     # SEMANTIC SEARCH
@@ -104,13 +110,11 @@ class Retriever:
         top_k=20
     ):
 
-        # Generate query embedding
         query_embedding = (
             self.embedding_model
             .generate_query_embedding(query)
         )
 
-        # Search ChromaDB
         results = self.vector_store.search(
             query_embedding,
             top_k
@@ -147,28 +151,31 @@ class Retriever:
     ):
 
         if self.bm25 is None:
+
             return []
 
-        # Tokenize query
         query_tokens = self.tokenize(
             query
         )
 
-        # Calculate BM25 scores
         scores = self.bm25.get_scores(
             query_tokens
         )
 
-        # Sort document indices
-        ranked_indices = sorted(
+        result_count = (
+            top_k
+            if top_k >= 0
+            else max(len(scores) + top_k, 0)
+        )
+        ranked_indices = heapq.nlargest(
+            result_count,
             range(len(scores)),
-            key=lambda i: scores[i],
-            reverse=True
+            key=scores.__getitem__
         )
 
         results = []
 
-        for index in ranked_indices[:top_k]:
+        for index in ranked_indices:
 
             results.append({
 
@@ -226,7 +233,7 @@ class Retriever:
         result_data = {}
 
         # --------------------------------
-        # Semantic ranking weight = 0.6
+        # Semantic weight = 0.6
         # --------------------------------
 
         for rank, result in enumerate(
@@ -251,7 +258,7 @@ class Retriever:
             result_data[key] = result
 
         # --------------------------------
-        # Keyword ranking weight = 0.4
+        # Keyword weight = 0.4
         # --------------------------------
 
         for rank, result in enumerate(
@@ -305,7 +312,8 @@ class Retriever:
             })
 
         return candidates
-    # FINAL RETRIEVAL + RERANKING + CODE BOOST
+
+    # FINAL RETRIEVAL
 
     def retrieve(
         self,
@@ -317,7 +325,10 @@ class Retriever:
         print(
             "\nRunning hybrid retrieval..."
         )
-        # 1. Get hybrid candidates
+
+        # --------------------------------
+        # 1. Hybrid candidates
+        # --------------------------------
 
         candidates = self.hybrid_search(
             query,
@@ -328,22 +339,50 @@ class Retriever:
             f"Hybrid retrieval found "
             f"{len(candidates)} candidates."
         )
-        # 2. Rerank all 20 candidates
 
-        print(
-            "Reranking candidates..."
-        )
+        # --------------------------------
+        # 2. Optional reranking
+        # --------------------------------
 
-        reranked_results = (
-            self.reranker.rerank(
-                query,
-                candidates,
-                top_k=20
+        if self.enable_reranker:
+
+            print(
+                "Reranking candidates..."
             )
-        )
-        # 3. Apply code-aware ranking
 
+            ranked_results = (
+                self.reranker.rerank(
+                    query,
+                    candidates,
+                    top_k=20
+                )
+            )
+
+        else:
+
+            print(
+                "Skipping reranking."
+            )
+
+            ranked_results = []
+
+            for candidate in candidates:
+
+                candidate["rerank_score"] = (
+                    candidate["hybrid_score"]
+                )
+
+                ranked_results.append(
+                    candidate
+                )
+
+            ranked_results.sort(
+                key=lambda x: x["rerank_score"],
+                reverse=True
+            )
+        # 3. Code-aware ranking
         code_extensions = {
+
             "js",
             "jsx",
             "ts",
@@ -356,23 +395,29 @@ class Retriever:
             "hpp",
             "go",
             "rs"
+
         }
 
         documentation_files = {
+
             "readme.md",
             "integration_guide.md",
             "contributing.md",
             "changelog.md"
+
         }
 
-        for result in reranked_results:
+        for result in ranked_results:
 
             code_boost = 0.0
+
             documentation_penalty = 0.0
 
             if prefer_code:
 
-                file_path = result["metadata"]["file"]
+                file_path = (
+                    result["metadata"]["file"]
+                )
 
                 extension = (
                     file_path
@@ -387,16 +432,16 @@ class Retriever:
                 )
 
                 if extension in code_extensions:
+
                     code_boost = 1.0
 
                 if file_name in documentation_files:
+
                     documentation_penalty = 0.5
 
-            # --------------------------------
-            # Final score
-            # --------------------------------
-
-            result["code_boost"] = code_boost
+            result["code_boost"] = (
+                code_boost
+            )
 
             result["documentation_penalty"] = (
                 documentation_penalty
@@ -407,31 +452,34 @@ class Retriever:
                 + code_boost
                 - documentation_penalty
             )
-
-        # --------------------------------
         # 4. Sort by final score
-        # --------------------------------
-
-        reranked_results.sort(
+        ranked_results.sort(
             key=lambda x: x["final_score"],
             reverse=True
         )
-
-        # 5. Keep the highest-ranked result from each file
+        # 5. One result per file
         unique_results = []
+
         seen_files = set()
 
-        for result in reranked_results:
+        for result in ranked_results:
 
-            file_path = result["metadata"]["file"]
+            file_path = (
+                result["metadata"]["file"]
+            )
 
             if file_path in seen_files:
+
                 continue
 
             seen_files.add(file_path)
-            unique_results.append(result)
+
+            unique_results.append(
+                result
+            )
 
             if len(unique_results) == top_k:
+
                 break
 
         print(
