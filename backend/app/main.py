@@ -43,14 +43,6 @@ logger = logging.getLogger(__name__)
 
 # SERVICE STATE
 
-# IMPORTANT:
-# Heavy services are intentionally NOT initialized at startup.
-#
-# They are created only when the corresponding endpoint is used.
-#
-# This keeps Render's 512 MB instance from loading the entire
-# ML/RAG stack during application startup.
-
 repository_service = None
 architecture_service = None
 file_service = None
