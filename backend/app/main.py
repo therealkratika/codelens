@@ -2,7 +2,7 @@ import sys
 import os
 import logging
 from pathlib import Path
-
+from fastapi.middleware.cors import CORSMiddleware
 # PATH SETUP
 if __package__ is None or __package__ == "":
     backend_root = Path(__file__).resolve().parent.parent
@@ -26,6 +26,17 @@ app = FastAPI(
     title="CodeLens API",
     description="AI Codebase Intelligence Backend",
     version="1.0.0"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://codelens-qspj.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 logger = logging.getLogger(__name__)
