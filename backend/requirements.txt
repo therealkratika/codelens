@@ -9,4 +9,5 @@ python-dotenv
 fastapi
 uvicorn
 rank-bm25
+tree-sitter
 tree-sitter-javascript
