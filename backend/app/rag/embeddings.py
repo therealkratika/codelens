@@ -5,23 +5,41 @@ class EmbeddingModel:
 
     def __init__(self):
 
-        print("Loading embedding model...")
+        self.model = None
 
-        self.model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )
+        print("Embedding model initialized lazily.")
 
-        print("Embedding model loaded!")
+    def _load_model(self):
+
+        if self.model is None:
+
+            print("Loading embedding model...")
+
+            self.model = SentenceTransformer(
+                "all-MiniLM-L6-v2"
+            )
+
+            print("Embedding model loaded!")
 
     def generate_embeddings(self, texts):
 
+        if not texts:
+            return []
+
+        self._load_model()
+
         return self.model.encode(
             texts,
-            show_progress_bar=True
+            show_progress_bar=True,
+            batch_size=32,
+            convert_to_numpy=True
         )
 
     def generate_query_embedding(self, query):
 
+        self._load_model()
+
         return self.model.encode(
-            [query]
+            [query],
+            convert_to_numpy=True
         )[0]
