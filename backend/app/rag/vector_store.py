@@ -1,4 +1,3 @@
-
 import hashlib
 import os
 from pathlib import Path
@@ -9,6 +8,33 @@ from dotenv import load_dotenv
 
 backend_root = Path(__file__).resolve().parents[2]
 load_dotenv(backend_root / ".env")
+
+
+def get_collection_name(repository_path=None):
+    """Return a stable collection name for a repository."""
+    if repository_path is None:
+        return "codebase"
+
+    resolved_path = Path(repository_path).resolve()
+
+    # clone_repo.py creates checkout folders as:
+    # <safe_repository_name>_<sha1_of_repository_url>
+    # The URL hash stays stable even if the checkout's absolute
+    # directory changes between deployments.
+    folder_name = resolved_path.name
+    suffix = folder_name.rsplit("_", 1)[-1]
+
+    if len(suffix) == 10 and all(
+        char in "0123456789abcdef" for char in suffix.lower()
+    ):
+        stable_id = suffix
+    else:
+        # Fallback for repositories that were not cloned by clone_repo.py.
+        stable_id = hashlib.sha1(
+            str(resolved_path).encode("utf-8")
+        ).hexdigest()[:16]
+
+    return f"codebase_{stable_id}"
 
 
 class VectorStore:
@@ -35,28 +61,7 @@ class VectorStore:
             )
             print("Using local ChromaDB.")
 
-        collection_name = "codebase"
-
-        if repository_path is not None:
-            resolved_path = Path(repository_path).resolve()
-
-            collections = self.client.list_collections()
-            collection_names = {
-                item if isinstance(item, str) else item.name
-                for item in collections
-            }
-
-            legacy_default = (
-                resolved_path.name.lower() == "nextja_coding_battle"
-                and "codebase" in collection_names
-            )
-
-            if not legacy_default:
-                path_hash = hashlib.sha1(
-                    str(resolved_path).encode("utf-8")
-                ).hexdigest()[:16]
-
-                collection_name = f"codebase_{path_hash}"
+        collection_name = get_collection_name(repository_path)
 
         self.collection = self.client.get_or_create_collection(
             name=collection_name
@@ -76,13 +81,11 @@ class VectorStore:
             index = start_index + offset
 
             documents.append(chunk["content"])
-
             metadatas.append({
                 "file": chunk["file"],
                 "start_line": chunk["start_line"],
                 "end_line": chunk["end_line"],
             })
-
             ids.append(f"chunk_{index}")
 
         embedding_list = (
@@ -113,9 +116,7 @@ class VectorStore:
             else query_embedding
         )
 
-        results = self.collection.query(
+        return self.collection.query(
             query_embeddings=[embedding],
             n_results=top_k,
         )
-
-        return results

@@ -14,9 +14,9 @@ CodeLens is a local codebase intelligence workspace. Import a GitHub repository,
 ## Architecture
 
 ```text
-frontend/  Next.js App Router, React, TypeScript
+frontend/  Vite, React, Tailwind CSS
     |
-    | /api/* rewrite (NEXT_PUBLIC_API_URL)
+    | VITE_API_URL
     v
 backend/   FastAPI
     |
@@ -66,12 +66,13 @@ The API listens at `http://127.0.0.1:8000`. The root endpoint returns a basic he
 
 The embedding model is downloaded the first time the backend initializes and is then cached by the model library. Initial startup and repository indexing can take a while, especially on CPU-only machines.
 
-### 3. Configure and start the frontend
+### 3. Install and start the frontend
 
-In a second terminal, create `frontend/.env.local`:
+In a second terminal, create `frontend/.env` from `frontend/.env.example` if
+you want to override the default local API URL:
 
 ```dotenv
-NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+VITE_API_URL=http://127.0.0.1:8000
 ```
 
 Then run:
@@ -82,18 +83,19 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Keep the backend running while using the frontend. Restart the Next.js development server after changing `.env.local`.
+Open `http://localhost:5173`. Keep the backend running while using the
+frontend. Restart Vite after changing `.env`.
 
-The deployed frontend defaults to the CodeLens Render backend at `https://codelens-fbcl.onrender.com`. Set `NEXT_PUBLIC_API_URL` in the Vercel project environment to override that backend URL; use the backend root without an `/api` suffix.
+## Using the frontend scaffold
 
-## Using CodeLens
+The Vite starter currently checks the backend connection and lets you import a
+public GitHub repository. It displays the background import status while the
+backend clones and indexes the repository. The other capabilities listed in
+the API overview are available through the backend API; their frontend views
+are not part of this starter scaffold.
 
-1. Open the frontend and enter a public GitHub repository URL, such as `https://github.com/owner/repository`.
-2. Wait for cloning, file loading, chunking, embedding, and indexing to finish.
-3. Ask questions in Code Chat or explore the Overview, Architecture, and File Explorer sections.
-4. Use **Switch Repo** to select a saved repository or import another one. The last imported/selected repository is restored when the backend restarts, as long as its checkout still exists.
-
-The import screen currently accepts GitHub repository URLs. Private repositories are not supported by the frontend's URL validation and may also require Git credentials that are not configured for the backend.
+The importer expects a public GitHub repository URL. Private repositories may
+require Git credentials that are not configured for the backend.
 
 ## API overview
 
@@ -140,9 +142,10 @@ Increasing the API quota or enabling billing may incur charges. Review Google's 
 
 ### The frontend reports that it cannot connect
 
-- Confirm the backend is running at the URL in `frontend/.env.local`.
-- Ensure `NEXT_PUBLIC_API_URL` has no `/api` suffix; Next.js adds the `/api/...` route.
-- Restart the frontend after changing `.env.local`.
+- Confirm the backend is running at the URL in `frontend/.env`, or at the
+  default `http://127.0.0.1:8000`.
+- Set `VITE_API_URL` to the backend root without an `/api` suffix.
+- Restart Vite after changing `frontend/.env`.
 - Repository imports run as backend jobs so a deployment proxy does not have to hold the connection open while cloning and indexing. If an import fails, the job status response contains the backend error.
 
 ### Repository import fails
@@ -171,7 +174,6 @@ Frontend:
 ```bash
 cd frontend
 npm run build
-npm run lint
 ```
 
 Backend syntax check:
