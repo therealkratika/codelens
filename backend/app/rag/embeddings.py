@@ -1,7 +1,7 @@
 import numpy as np
 from fastembed import TextEmbedding
 
-ENCODE_BATCH_SIZE = 32
+ENCODE_BATCH_SIZE = 8
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
