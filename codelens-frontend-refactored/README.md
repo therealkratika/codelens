@@ -35,6 +35,8 @@ npm run dev
 - `GET /api/repository/import/{job_id}`
 - `POST /api/repository/activate` with `{ "repository_path": "..." }`
 - `POST /api/chat` with `{ "question": "..." }`
+- `GET /api/architecture/flows`
+- `GET /api/architecture/graph`
 
 ## Honest feature boundaries
-Architecture and Code Explorer call the existing `/api/chat` endpoint with targeted prompts. Indexed Chunks displays aggregate `files`/`chunks` metadata from saved repositories and uses chat for an explanation of indexing. The current backend contract provided in the project context does not confirm endpoints for a graph of architecture, raw file browsing, or listing individual chunk records; the UI does not fabricate those records. For actual graph/file/chunk records, add dedicated backend endpoints and then update the matching `api/*Api.js` service.
+Architecture loads the backend's feature-flow and code-graph endpoints. Code Explorer uses `/api/chat` with a targeted prompt. Indexed Chunks displays aggregate `files`/`chunks` metadata from saved repositories and uses chat for an explanation of indexing. The backend also provides file-tree and file-content endpoints; the UI does not fabricate individual chunk records.
