@@ -5,7 +5,6 @@ import ImportPage from "./pages/ImportPage";
 import DashboardPage from "./pages/DashboardPage";
 import ArchitecturePage from "./pages/ArchitecturePage";
 import CodeExplorerPage from "./pages/CodeExplorerPage";
-import ChunksPage from "./pages/ChunksPage";
 import ChatPage from "./pages/ChatPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -22,12 +21,13 @@ function ProtectedWorkspace() {
 export default function App() {
   return <RepositoryProvider><Routes>
     <Route path="/" element={<ImportPage/>}/>
+    <Route path="/import" element={<ImportPage/>}/>
     <Route element={<ProtectedWorkspace/>}>
       <Route path="/dashboard" element={<DashboardPage/>}/>
       <Route path="/repositories" element={<RepositoriesPage/>}/>
       <Route path="/architecture" element={<ArchitecturePage/>}/>
       <Route path="/code" element={<CodeExplorerPage/>}/>
-      <Route path="/chunks" element={<ChunksPage/>}/>
+      <Route path="/chunks" element={<Navigate to="/code" replace/>}/>
       <Route path="/chat" element={<ChatPage/>}/>
       <Route path="/settings" element={<SettingsPage/>}/>
     </Route>

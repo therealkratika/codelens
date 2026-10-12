@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 const groups = [
   { label: "WORKSPACE", links: [{ to: "/dashboard", icon: "◫", label: "Dashboard" }, { to: "/repositories", icon: "▤", label: "Repositories" }] },
-  { label: "EXPLORE CODE", links: [{ to: "/architecture", icon: "⌘", label: "Architecture" }, { to: "/code", icon: "</>", label: "Code explorer" }, { to: "/chunks", icon: "▦", label: "Indexed chunks" }, { to: "/chat", icon: "✳", label: "Code chat", tag: "AI" }] },
+  { label: "EXPLORE CODE", links: [{ to: "/architecture", icon: "⌘", label: "Architecture" }, { to: "/code", icon: "</>", label: "Code explorer" }, { to: "/chat", icon: "✳", label: "Code chat", tag: "AI" }] },
 ];
 export default function Sidebar({ onImport, health }) {
   return <aside className="sidebar">

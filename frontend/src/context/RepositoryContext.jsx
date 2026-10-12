@@ -70,7 +70,7 @@ export function RepositoryProvider({ children }) {
     ...repositoryState, health,
     architecture, analyzeArchitecture,
     chat, sendChat, clearChatError: () => setChat((current) => ({ ...current, error: "" })),
-    goToImport: () => navigate("/"),
+    goToImport: () => navigate("/import"),
     goToDashboard: () => navigate("/dashboard"),
   }), [repositoryState, health, architecture, chat, navigate]);
   return <RepositoryContext.Provider value={value}>{children}</RepositoryContext.Provider>;
