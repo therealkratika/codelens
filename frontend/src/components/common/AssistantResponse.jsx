@@ -4,7 +4,11 @@ function InlineText({ children }) {
   const parts = String(children).split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
-      return <code className="answer-inline-code" key={index}>{part.slice(1, -1)}</code>;
+      return (
+        <code className="answer-inline-code" key={index}>
+          {part.slice(1, -1)}
+        </code>
+      );
     }
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
@@ -14,7 +18,8 @@ function InlineText({ children }) {
 }
 
 export default function AssistantResponse({ content, sources = [] }) {
-  const text = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+  const text =
+    typeof content === "string" ? content : JSON.stringify(content, null, 2);
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
   let paragraph = [];
@@ -31,7 +36,11 @@ export default function AssistantResponse({ content, sources = [] }) {
     if (line.trim().startsWith("```")) {
       flushParagraph();
       if (code) {
-        blocks.push({ type: "code", language: code.language, text: code.lines.join("\n") });
+        blocks.push({
+          type: "code",
+          language: code.language,
+          text: code.lines.join("\n"),
+        });
         code = null;
       } else {
         code = { language: line.trim().slice(3).trim(), lines: [] };
@@ -65,31 +74,57 @@ export default function AssistantResponse({ content, sources = [] }) {
     if (ordered) {
       flushParagraph();
       const previous = blocks[blocks.length - 1];
-      if (previous?.type === "list" && previous.ordered) previous.items.push(ordered[1]);
+      if (previous?.type === "list" && previous.ordered)
+        previous.items.push(ordered[1]);
       else blocks.push({ type: "list", ordered: true, items: [ordered[1]] });
       return;
     }
     paragraph.push(trimmed);
   });
 
-  if (code) blocks.push({ type: "code", language: code.language, text: code.lines.join("\n") });
+  if (code)
+    blocks.push({
+      type: "code",
+      language: code.language,
+      text: code.lines.join("\n"),
+    });
   flushParagraph();
 
   return (
     <div className="assistant-response">
       {blocks.map((block, index) => {
-        if (block.type === "heading") return <h3 key={index}><InlineText>{block.text}</InlineText></h3>;
-        if (block.type === "code") return (
-          <pre className="answer-code" key={index}>
-            {block.language && <span className="answer-code-language">{block.language}</span>}
-            <code>{block.text}</code>
-          </pre>
-        );
+        if (block.type === "heading")
+          return (
+            <h3 key={index}>
+              <InlineText>{block.text}</InlineText>
+            </h3>
+          );
+        if (block.type === "code")
+          return (
+            <pre className="answer-code" key={index}>
+              {block.language && (
+                <span className="answer-code-language">{block.language}</span>
+              )}
+              <code>{block.text}</code>
+            </pre>
+          );
         if (block.type === "list") {
           const List = block.ordered ? "ol" : "ul";
-          return <List className="answer-list" key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}><InlineText>{item}</InlineText></li>)}</List>;
+          return (
+            <List className="answer-list" key={index}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>
+                  <InlineText>{item}</InlineText>
+                </li>
+              ))}
+            </List>
+          );
         }
-        return <p key={index}><InlineText>{block.text}</InlineText></p>;
+        return (
+          <p key={index}>
+            <InlineText>{block.text}</InlineText>
+          </p>
+        );
       })}
       <SourceReferences sources={sources} />
     </div>

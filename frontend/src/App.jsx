@@ -16,21 +16,25 @@ import "./styles/pages.css";
 function ProtectedWorkspace() {
   const { activeRepository, loading } = useRepository();
   if (loading) return <Loader label="Loading your repositories…" />;
-  return activeRepository ? <AppLayout/> : <Navigate to="/" replace/>;
+  return activeRepository ? <AppLayout /> : <Navigate to="/" replace />;
 }
 export default function App() {
-  return <RepositoryProvider><Routes>
-    <Route path="/" element={<ImportPage/>}/>
-    <Route path="/import" element={<ImportPage/>}/>
-    <Route element={<ProtectedWorkspace/>}>
-      <Route path="/dashboard" element={<DashboardPage/>}/>
-      <Route path="/repositories" element={<RepositoriesPage/>}/>
-      <Route path="/architecture" element={<ArchitecturePage/>}/>
-      <Route path="/code" element={<CodeExplorerPage/>}/>
-      <Route path="/chunks" element={<Navigate to="/code" replace/>}/>
-      <Route path="/chat" element={<ChatPage/>}/>
-      <Route path="/settings" element={<SettingsPage/>}/>
-    </Route>
-    <Route path="*" element={<Navigate to="/" replace/>}/>
-  </Routes></RepositoryProvider>;
+  return (
+    <RepositoryProvider>
+      <Routes>
+        <Route path="/" element={<ImportPage />} />
+        <Route path="/import" element={<ImportPage />} />
+        <Route element={<ProtectedWorkspace />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/repositories" element={<RepositoriesPage />} />
+          <Route path="/architecture" element={<ArchitecturePage />} />
+          <Route path="/code" element={<CodeExplorerPage />} />
+          <Route path="/chunks" element={<Navigate to="/code" replace />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </RepositoryProvider>
+  );
 }

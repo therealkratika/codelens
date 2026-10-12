@@ -5,7 +5,8 @@ import EmptyState from "../components/common/EmptyState";
 import { useRepository } from "../context/RepositoryContext";
 
 export default function ArchitecturePage() {
-  const { activeRepository, goToImport, architecture, analyzeArchitecture } = useRepository();
+  const { activeRepository, goToImport, architecture, analyzeArchitecture } =
+    useRepository();
   const { result, busy, error } = architecture;
 
   return (
@@ -15,7 +16,10 @@ export default function ArchitecturePage() {
         title="Architecture"
         description="Explore repository dependencies and traced frontend-to-backend flows."
         action={
-          <Button onClick={analyzeArchitecture} disabled={!activeRepository || busy}>
+          <Button
+            onClick={analyzeArchitecture}
+            disabled={!activeRepository || busy}
+          >
             ✦ Analyze architecture
           </Button>
         }
@@ -40,15 +44,25 @@ export default function ArchitecturePage() {
             <>
               <div className="architecture-stats">
                 <div className="architecture-stat">
-                  <strong>{result.graph.summary?.nodes ?? result.graph.nodes?.length ?? 0}</strong>
+                  <strong>
+                    {result.graph.summary?.nodes ??
+                      result.graph.nodes?.length ??
+                      0}
+                  </strong>
                   <span>Code files</span>
                 </div>
                 <div className="architecture-stat">
-                  <strong>{result.graph.summary?.edges ?? result.graph.edges?.length ?? 0}</strong>
+                  <strong>
+                    {result.graph.summary?.edges ??
+                      result.graph.edges?.length ??
+                      0}
+                  </strong>
                   <span>Relationships</span>
                 </div>
                 <div className="architecture-stat">
-                  <strong>{result.flows.total ?? result.flows.flows?.length ?? 0}</strong>
+                  <strong>
+                    {result.flows.total ?? result.flows.flows?.length ?? 0}
+                  </strong>
                   <span>Traced flows</span>
                 </div>
               </div>
@@ -66,13 +80,21 @@ export default function ArchitecturePage() {
                           className="architecture-flow"
                           key={flow.id || `${flow.name || "flow"}-${index}`}
                         >
-                          <strong>{flow.name || api?.function || flow.feature || "Unnamed flow"}</strong>
+                          <strong>
+                            {flow.name ||
+                              api?.function ||
+                              flow.feature ||
+                              "Unnamed flow"}
+                          </strong>
                           {api && (
                             <div className="architecture-flow-step">
                               <span>Frontend API</span>
                               <code>
                                 {api.method ? `${api.method} ` : ""}
-                                {api.resolved_endpoint || api.endpoint || api.file || "Endpoint unavailable"}
+                                {api.resolved_endpoint ||
+                                  api.endpoint ||
+                                  api.file ||
+                                  "Endpoint unavailable"}
                               </code>
                             </div>
                           )}
@@ -81,17 +103,24 @@ export default function ArchitecturePage() {
                               <span>Backend route</span>
                               <code>
                                 {route.method ? `${route.method} ` : ""}
-                                {route.path || route.handler || "Route unavailable"}
+                                {route.path ||
+                                  route.handler ||
+                                  "Route unavailable"}
                               </code>
                             </div>
                           ) : (
-                            <p className="muted">No matching backend route was identified.</p>
+                            <p className="muted">
+                              No matching backend route was identified.
+                            </p>
                           )}
                           {controller && (
                             <div className="architecture-flow-step">
                               <span>Controller</span>
                               <code>
-                                {controller.controller_file || controller.file || controller.name || "Resolved"}
+                                {controller.controller_file ||
+                                  controller.file ||
+                                  controller.name ||
+                                  "Resolved"}
                               </code>
                             </div>
                           )}
@@ -100,21 +129,29 @@ export default function ArchitecturePage() {
                     })}
                   </div>
                 ) : (
-                  <p className="muted">No frontend API flows were found for this repository.</p>
+                  <p className="muted">
+                    No frontend API flows were found for this repository.
+                  </p>
                 )}
               </div>
 
               <div className="architecture-section">
                 <h2>Code dependency map</h2>
-                {Array.isArray(result.graph.nodes) && result.graph.nodes.length ? (
+                {Array.isArray(result.graph.nodes) &&
+                result.graph.nodes.length ? (
                   <div className="architecture-node-list">
                     {result.graph.nodes.map((node) => (
-                      <div className="architecture-node" key={node.id || node.file}>
+                      <div
+                        className="architecture-node"
+                        key={node.id || node.file}
+                      >
                         <strong>{node.file || node.id}</strong>
                         <span>
-                          {node.functions_count ?? node.functions?.length ?? 0} functions
+                          {node.functions_count ?? node.functions?.length ?? 0}{" "}
+                          functions
                           {" · "}
-                          {node.imports_count ?? node.imports?.length ?? 0} imports
+                          {node.imports_count ?? node.imports?.length ?? 0}{" "}
+                          imports
                           {" · "}
                           {node.calls_count ?? node.calls?.length ?? 0} calls
                         </span>
@@ -131,7 +168,11 @@ export default function ArchitecturePage() {
               icon="⌘"
               title="Ready to analyze"
               description="Load the dependency graph and frontend-to-backend flows from the active repository."
-              action={<Button onClick={analyzeArchitecture}>Analyze repository</Button>}
+              action={
+                <Button onClick={analyzeArchitecture}>
+                  Analyze repository
+                </Button>
+              }
             />
           )}
         </section>
