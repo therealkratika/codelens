@@ -47,6 +47,14 @@ Create `backend/.env`:
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
+For a deployed frontend, set `CODELENS_CORS_ORIGINS` to a comma-separated list
+of allowed frontend origins. The default includes the deployed frontend and
+the local Vite origins:
+
+```dotenv
+CODELENS_CORS_ORIGINS=https://codelens-qspj.vercel.app,http://localhost:5173,http://127.0.0.1:5173
+```
+
 Get a key from [Google AI Studio](https://aistudio.google.com/app/apikey). Do not commit `.env` files or share the key. The backend loads `GEMINI_API_KEY` from its environment.
 
 ### 2. Install and start the backend
@@ -74,6 +82,11 @@ you want to override the default local API URL:
 ```dotenv
 VITE_API_URL=http://127.0.0.1:8000
 ```
+
+Production builds use `https://codelens-fbcl.onrender.com` as the deployed
+backend root. If configuring the Vercel project settings manually, set
+`VITE_API_URL` to that URL without an `/api` suffix. Keep the local value above
+for local development.
 
 Then run:
 

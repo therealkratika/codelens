@@ -29,15 +29,25 @@ app = FastAPI(
     description="AI Codebase Intelligence Backend",
     version="1.0.0"
 )
+
+default_cors_origins = [
+    "https://codelens-qspj.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CODELENS_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if not cors_origins:
+    cors_origins = default_cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://codelens-qspj.vercel.app",
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

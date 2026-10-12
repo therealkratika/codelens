@@ -20,6 +20,11 @@ Create `.env`:
 VITE_API_URL=http://localhost:8000
 ```
 
+Production builds use the deployed backend at
+`https://codelens-fbcl.onrender.com`. If configuring the Vercel project
+environment manually, set `VITE_API_URL` to that same root URL, without an
+`/api` suffix. The local value remains `http://localhost:8000`.
+
 Run the backend in one terminal:
 
 ```bash

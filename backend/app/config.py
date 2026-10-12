@@ -1,6 +1,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import certifi
 from dotenv import load_dotenv
@@ -9,16 +10,17 @@ from pymongo import MongoClient
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_ROOT / ".env")
 
-MONGODB_URI = (
-    os.getenv("MONGODB_URI_LOCAL")
-    if os.getenv("CODELENS_USE_LOCAL_MONGODB", "").lower() == "true"
-    else os.getenv("MONGODB_URI")
-)
+MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "codelens")
 
 if not MONGODB_URI:
     raise RuntimeError(
         "MONGODB_URI is missing. Add it to your backend .env file."
+    )
+
+if urlsplit(MONGODB_URI).hostname in {"localhost", "127.0.0.1", "::1"}:
+    raise RuntimeError(
+        "MONGODB_URI must point to a deployed MongoDB instance, not localhost."
     )
 
 mongo_options = {"serverSelectionTimeoutMS": 10000}
