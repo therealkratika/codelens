@@ -31,7 +31,7 @@ app = FastAPI(
 )
 
 default_cors_origins = [
-    "https://codelens-qspj.vercel.app",
+    "https://codelens-flax.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:5173",
