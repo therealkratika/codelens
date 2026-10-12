@@ -632,6 +632,43 @@ class RAGPipeline:
 
         return "\n".join(lines)
 
+    def build_retrieval_fallback(self, question, results):
+        """Return useful repository context when the external LLM is unavailable."""
+        if not results:
+            return (
+                "I could not find matching code for that question. "
+                "Try naming a file, function, route, or feature."
+            )
+
+        lines = [
+            "The AI model is temporarily unavailable, "
+            "but I found this relevant repository context.",
+            "",
+            f"Question: {question}",
+            "",
+            "Relevant files:",
+        ]
+
+        for result in results[:5]:
+            metadata = result["metadata"]
+            file_path = metadata.get("file", "Unknown file")
+            start_line = metadata.get("start_line", "?")
+            end_line = metadata.get("end_line", "?")
+            document = result.get("document", "").strip()
+            preview = " ".join(document.split())
+            if len(preview) > 280:
+                preview = f"{preview[:277]}..."
+
+            lines.append(f"- `{file_path}` (lines {start_line}-{end_line})")
+            if preview:
+                lines.append(f"  {preview}")
+
+        lines.extend([
+            "",
+            "Ask again when the AI service is available for a deeper explanation.",
+        ])
+        return "\n".join(lines)
+
     def answer(
         self,
         question,
@@ -766,10 +803,14 @@ Now answer the user's question.
                     question,
                     feature_flows
                 )
-                if on_text is not None:
-                    on_text(answer)
             else:
-                raise
+                answer = self.build_retrieval_fallback(
+                    question,
+                    results
+                )
+
+            if on_text is not None:
+                on_text(answer)
 
         # 7. BUILD SOURCES
 

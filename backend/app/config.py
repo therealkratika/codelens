@@ -9,7 +9,11 @@ from pymongo import MongoClient
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_ROOT / ".env")
 
-MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_URI = (
+    os.getenv("MONGODB_URI_LOCAL")
+    if os.getenv("CODELENS_USE_LOCAL_MONGODB", "").lower() == "true"
+    else os.getenv("MONGODB_URI")
+)
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "codelens")
 
 if not MONGODB_URI:
@@ -17,11 +21,11 @@ if not MONGODB_URI:
         "MONGODB_URI is missing. Add it to your backend .env file."
     )
 
-mongo_client = MongoClient(
-    MONGODB_URI,
-    tlsCAFile=certifi.where(),
-    serverSelectionTimeoutMS=10000,
-)
+mongo_options = {"serverSelectionTimeoutMS": 10000}
+if MONGODB_URI.startswith("mongodb+srv://"):
+    mongo_options.update(tls=True, tlsCAFile=certifi.where())
+
+mongo_client = MongoClient(MONGODB_URI, **mongo_options)
 
 database = mongo_client[MONGODB_DATABASE]
 repositories_collection = database["repositories"]

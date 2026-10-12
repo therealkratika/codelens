@@ -9,12 +9,14 @@ import ChunksPage from "./pages/ChunksPage";
 import ChatPage from "./pages/ChatPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import SettingsPage from "./pages/SettingsPage";
+import Loader from "./components/common/Loader";
 import "./styles/global.css";
 import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/pages.css";
 function ProtectedWorkspace() {
-  const { activeRepository } = useRepository();
+  const { activeRepository, loading } = useRepository();
+  if (loading) return <Loader label="Loading your repositories…" />;
   return activeRepository ? <AppLayout/> : <Navigate to="/" replace/>;
 }
 export default function App() {

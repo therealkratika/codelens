@@ -1,32 +1,12 @@
-import { useState } from "react";
 import PageHeader from "../components/layout/PageHeader";
 import Button from "../components/common/Button";
 import Loader from "../components/common/Loader";
 import EmptyState from "../components/common/EmptyState";
-import { getArchitectureFlows, getArchitectureGraph } from "../api/architectureApi";
 import { useRepository } from "../context/RepositoryContext";
 
 export default function ArchitecturePage() {
-  const { activeRepository, goToImport } = useRepository();
-  const [result, setResult] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function analyze() {
-    setBusy(true);
-    setError("");
-    try {
-      const [flows, graph] = await Promise.all([
-        getArchitectureFlows(),
-        getArchitectureGraph(),
-      ]);
-      setResult({ flows, graph });
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { activeRepository, goToImport, architecture, analyzeArchitecture } = useRepository();
+  const { result, busy, error } = architecture;
 
   return (
     <>
@@ -35,7 +15,7 @@ export default function ArchitecturePage() {
         title="Architecture"
         description="Explore repository dependencies and traced frontend-to-backend flows."
         action={
-          <Button onClick={analyze} disabled={!activeRepository || busy}>
+          <Button onClick={analyzeArchitecture} disabled={!activeRepository || busy}>
             ✦ Analyze architecture
           </Button>
         }
@@ -86,7 +66,7 @@ export default function ArchitecturePage() {
                           className="architecture-flow"
                           key={flow.id || `${flow.name || "flow"}-${index}`}
                         >
-                          <strong>{flow.name || api?.function || "Unnamed flow"}</strong>
+                          <strong>{flow.name || api?.function || flow.feature || "Unnamed flow"}</strong>
                           {api && (
                             <div className="architecture-flow-step">
                               <span>Frontend API</span>
@@ -126,7 +106,7 @@ export default function ArchitecturePage() {
 
               <div className="architecture-section">
                 <h2>Code dependency map</h2>
-                {result.graph.nodes?.length ? (
+                {Array.isArray(result.graph.nodes) && result.graph.nodes.length ? (
                   <div className="architecture-node-list">
                     {result.graph.nodes.map((node) => (
                       <div className="architecture-node" key={node.id || node.file}>
@@ -151,7 +131,7 @@ export default function ArchitecturePage() {
               icon="⌘"
               title="Ready to analyze"
               description="Load the dependency graph and frontend-to-backend flows from the active repository."
-              action={<Button onClick={analyze}>Analyze repository</Button>}
+              action={<Button onClick={analyzeArchitecture}>Analyze repository</Button>}
             />
           )}
         </section>
