@@ -412,6 +412,7 @@ def get_saved_repositories():
 # ============================================================
 
 @app.post("/api/repository/activate")
+@app.post("/repository/activate")
 def activate_repository(
     request: RepositoryActivationRequest
 ):
@@ -797,6 +798,7 @@ def get_repository_suggestions():
 
 # CHAT
 @app.post("/api/chat")
+@app.post("/chat")
 def chat(
     request: ChatRequest
 ):
