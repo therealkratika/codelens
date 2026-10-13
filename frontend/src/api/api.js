@@ -15,9 +15,9 @@ export async function apiRequest(endpoint, options = {}) {
       ...options,
       signal: controller.signal,
       headers: {
-        ...(options.body instanceof FormData
-          ? {}
-          : { "Content-Type": "application/json" }),
+        ...(options.body && !(options.body instanceof FormData)
+          ? { "Content-Type": "application/json" }
+          : {}),
         ...options.headers,
       },
     });

@@ -37,13 +37,14 @@ default_cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-cors_origins = [
-    origin.strip()
+configured_cors_origins = [
+    origin.strip().rstrip("/")
     for origin in os.getenv("CODELENS_CORS_ORIGINS", "").split(",")
     if origin.strip()
 ]
-if not cors_origins:
-    cors_origins = default_cors_origins
+cors_origins = list(
+    dict.fromkeys(default_cors_origins + configured_cors_origins)
+)
 
 app.add_middleware(
     CORSMiddleware,
