@@ -150,10 +150,7 @@ def setup_active_services(repo_path: str):
     architecture_service = None
     file_service = None
 
-
-# ============================================================
 # AUTO LOAD SAVED REPOSITORY
-# ============================================================
 
 def auto_load_saved_repository():
     """
@@ -251,11 +248,8 @@ def auto_load_saved_repository():
         )
 
         return False
-
-
-# ============================================================
+    
 # REQUEST MODELS
-# ============================================================
 
 class RepositoryImportRequest(BaseModel):
 
@@ -388,10 +382,7 @@ def get_repository_import_status(job_id: str):
         )
     return job
 
-
-# ============================================================
 # SAVED REPOSITORIES
-# ============================================================
 
 @app.get("/api/repository/saved")
 def get_saved_repositories():
@@ -406,10 +397,7 @@ def get_saved_repositories():
             .active_repository_path,
     }
 
-
-# ============================================================
 # ACTIVATE REPOSITORY
-# ============================================================
 
 @app.post("/api/repository/activate")
 @app.post("/repository/activate")
@@ -534,11 +522,7 @@ def repository_status():
             repository_manager.get_repository_path()
     }
 
-
-# ============================================================
 # CURRENT REPOSITORY
-# ============================================================
-
 @app.get("/api/repository")
 def get_repository():
 
@@ -565,12 +549,7 @@ def get_repository():
 
         "loaded": True
     }
-
-
-# ============================================================
 # REPOSITORY SUGGESTIONS
-# ============================================================
-
 @app.get("/api/repository/suggestions")
 def get_repository_suggestions():
 
