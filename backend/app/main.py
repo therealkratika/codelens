@@ -17,6 +17,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.repository_manager import RepositoryManager
+from app.github.clone_repo import validate_repository_url
 
 # APPLICATION
 logger = logging.getLogger(__name__)
@@ -305,13 +306,13 @@ def import_repository(
     request: RepositoryImportRequest,
     background_tasks: BackgroundTasks,
 ):
-    repo_url = request.repo_url.strip()
-
-    if not repo_url:
+    try:
+        repo_url = validate_repository_url(request.repo_url)
+    except ValueError as error:
         raise HTTPException(
             status_code=400,
-            detail="Repository URL cannot be empty.",
-        )
+            detail=str(error),
+        ) from error
 
     if not repository_import_lock.acquire(blocking=False):
         raise HTTPException(

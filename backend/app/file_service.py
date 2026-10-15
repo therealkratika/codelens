@@ -86,10 +86,10 @@ class FileService:
     def get_file_content(self, relative_path: str) -> Dict[str, Any]:
         # Normalize and guard against directory traversal
         clean_rel = relative_path.lstrip("/").replace("\\", "/")
-        full_path = os.path.abspath(os.path.join(self.repository_path, clean_rel))
-        repo_abs = os.path.abspath(self.repository_path)
+        repo_root = os.path.realpath(self.repository_path)
+        full_path = os.path.realpath(os.path.join(repo_root, clean_rel))
 
-        if not full_path.startswith(repo_abs):
+        if full_path != repo_root and repo_root not in Path(full_path).parents:
             raise ValueError("Path is outside the repository")
 
         if not os.path.exists(full_path) or not os.path.isfile(full_path):

@@ -4,7 +4,7 @@ from itertools import islice
 from pathlib import Path
 from urllib.parse import urlparse
 
-from app.github.clone_repo import clone_repository
+from app.github.clone_repo import clone_repository, validate_repository_url
 from app.ingestion.loader import iter_files
 from app.ingestion.chunker import iter_document_chunks
 from app.rag.embeddings import EmbeddingModel
@@ -57,10 +57,7 @@ class RepositoryService:
         return name
 
     def import_repository(self, repo_url: str):
-        repo_url = repo_url.strip()
-
-        if not repo_url:
-            raise ValueError("Repository URL cannot be empty.")
+        repo_url = validate_repository_url(repo_url)
 
         repo_name = self._get_repository_name(repo_url)
 

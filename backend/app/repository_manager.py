@@ -265,7 +265,11 @@ class RepositoryManager:
     # STATUS
 
     def is_loaded(self):
-        return bool(self.repository_path)
+        with self._lock:
+            return bool(
+                self.repository_path
+                and Path(self.repository_path).expanduser().is_dir()
+            )
 
     def is_rag_loaded(self):
         return self.rag_pipeline is not None
