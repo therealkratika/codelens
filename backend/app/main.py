@@ -376,6 +376,7 @@ def root():
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok"}
 
@@ -737,3 +738,10 @@ def get_file_content(
             status_code=500,
             detail="Could not read the requested file.",
         )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)

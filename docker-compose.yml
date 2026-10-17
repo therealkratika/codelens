@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-codelens}
+      - CODELENS_CORS_ORIGINS=${CODELENS_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      - CHROMA_API_KEY=${CHROMA_API_KEY:-}
+      - CHROMA_TENANT=${CHROMA_TENANT:-}
+      - CHROMA_DATABASE=${CHROMA_DATABASE:-codelens}
+    volumes:
+      - backend_repos:/app/repositories
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend_repos:
