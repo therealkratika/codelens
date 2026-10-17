@@ -335,6 +335,28 @@
   }
 }
 @media (max-width: 600px) {
+  .chat-session-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .chat-session-picker select {
+    flex: 1;
+    max-width: none;
+  }
+  .chat-session-actions {
+    flex-wrap: wrap;
+  }
+  .chat-rename-form {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .chat-rename-form input {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .chat-rename-form .button {
+    order: 3;
+  }
   .topbar {
     height: 59px;
     padding: 0 13px;

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import PageHeader from "../components/layout/PageHeader";
 import ChatMessage from "../components/chat/ChatMessage";
 import ChatInput from "../components/chat/ChatInput";
@@ -8,11 +8,39 @@ import { useRepository } from "../context/RepositoryContext";
 import useChat from "../hooks/useChat";
 export default function ChatPage() {
   const { activeRepository, goToImport } = useRepository();
-  const { messages, busy, error, setError, send } = useChat();
+  const {
+    messages,
+    busy,
+    error,
+    setError,
+    send,
+    sessions,
+    sessionId,
+    newChat,
+    selectChat,
+    deleteChat,
+    renameChat,
+  } = useChat();
+  const [renaming, setRenaming] = useState(false);
+  const [chatName, setChatName] = useState("");
   const bottom = useRef(null);
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
+  const currentSession = sessions.find(
+    (session) => session.session_id === sessionId,
+  );
+  function beginRename() {
+    setChatName(currentSession?.title || "");
+    setRenaming(true);
+  }
+  async function saveName(event) {
+    event.preventDefault();
+    const title = chatName.trim();
+    if (!title || !sessionId) return;
+    await renameChat(sessionId, title);
+    setRenaming(false);
+  }
   return (
     <>
       <PageHeader
@@ -34,6 +62,70 @@ export default function ChatPage() {
             </div>
             <span className="chat-context-badge">RAG powered</span>
           </div>
+          <div className="chat-session-toolbar">
+            <div className="chat-session-picker">
+              <span className="chat-session-label">Conversation</span>
+              <select
+                value={sessionId || ""}
+                onChange={(event) => selectChat(event.target.value)}
+                disabled={busy || !sessions.length}
+                aria-label="Saved chats"
+              >
+                {!sessions.length && <option value="">No saved chats</option>}
+                {sessions.map((session) => (
+                  <option key={session.session_id} value={session.session_id}>
+                    {session.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="chat-session-actions">
+              <Button onClick={newChat} disabled={busy || !activeRepository}>
+                + New chat
+              </Button>
+              {sessionId && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={beginRename}
+                    disabled={busy}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => deleteChat(sessionId)}
+                    disabled={busy}
+                  >
+                    Delete
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          {renaming && (
+            <form className="chat-rename-form" onSubmit={saveName}>
+              <label htmlFor="chat-name">Chat name</label>
+              <input
+                id="chat-name"
+                value={chatName}
+                maxLength={120}
+                autoFocus
+                onChange={(event) => setChatName(event.target.value)}
+                placeholder="e.g. Authentication flow"
+              />
+              <Button type="submit" disabled={!chatName.trim()}>
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRenaming(false)}
+              >
+                Cancel
+              </Button>
+            </form>
+          )}
           <div className="chat-messages">
             {!messages.length ? (
               <div className="chat-empty">

@@ -70,6 +70,13 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+When your working directory is `backend/`, the equivalent compatibility
+command is also supported:
+
+```bash
+uvicorn main:app --reload
+```
+
 The API listens at `http://127.0.0.1:8000`. The root endpoint returns a basic health/status response. FastAPI's interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
 The embedding model is downloaded the first time the backend initializes and is then cached by the model library. Initial startup and repository indexing can take a while, especially on CPU-only machines.
@@ -123,10 +130,21 @@ require Git credentials that are not configured for the backend.
 | `POST` | `/api/repository/activate` | Activate a saved repository |
 | `GET` | `/api/repository/suggestions` | Get suggested questions for the active repository |
 | `POST` | `/api/chat` | Ask a question about the active repository |
+| `GET` | `/api/chat/sessions` | List saved chats for the active repository |
+| `POST` | `/api/chat/sessions` | Start a fresh chat for the active repository |
+| `GET` | `/api/chat/sessions/{session_id}` | Load a saved chat |
+| `PATCH` | `/api/chat/sessions/{session_id}` | Rename a saved chat |
+| `DELETE` | `/api/chat/sessions/{session_id}` | Delete a saved chat |
 | `GET` | `/api/architecture/flows` | Get detected API and feature flows |
 | `GET` | `/api/architecture/graph` | Get the code dependency graph |
 | `GET` | `/api/files/tree` | Get the repository file tree |
 | `GET` | `/api/files/content?path=...` | Get a file and its indexed chunk metadata |
+
+Chat sessions are persisted in MongoDB per repository. The chat page restores
+the most recent session when a repository is activated; use **New chat** to
+start a separate conversation or **Delete** to remove a saved conversation.
+The existing `POST /api/chat` endpoint remains compatible and accepts an
+optional `session_id` to append to a selected session.
 
 ## Indexing and retrieval details
 

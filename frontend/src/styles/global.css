@@ -89,6 +89,14 @@ a {
   color: #6c5cda;
   border: 1px solid #e2defd;
 }
+.button-danger {
+  background: #fff1f2;
+  color: #c2415a;
+  border: 1px solid #ffd9df;
+}
+.button-danger:hover:not(:disabled) {
+  background: #ffe4e8;
+}
 .full-width {
   width: 100%;
 }
