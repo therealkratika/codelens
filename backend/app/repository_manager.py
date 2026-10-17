@@ -64,12 +64,18 @@ class RepositoryManager:
         active_path = Path(self.active_repository_path).expanduser()
 
         if not active_path.is_dir():
-            logger.warning(
-                "Saved active repository path does not exist: %s",
-                active_path,
-            )
-            self.active_repository_path = None
-            return
+            folder_name = active_path.name
+            backend_root = Path(__file__).resolve().parent.parent
+            local_target = backend_root / "repositories" / folder_name
+            if local_target.is_dir():
+                active_path = local_target
+            else:
+                logger.warning(
+                    "Saved active repository path does not exist: %s",
+                    active_path,
+                )
+                self.active_repository_path = None
+                return
 
         resolved_path = str(active_path.resolve())
 
@@ -78,9 +84,10 @@ class RepositoryManager:
                 item
                 for item in self.repositories
                 if item.get("repository_path")
-                and str(
-                    Path(item["repository_path"]).expanduser().resolve()
-                ) == resolved_path
+                and (
+                    str(Path(item["repository_path"]).expanduser().resolve()) == resolved_path
+                    or Path(item["repository_path"]).name == active_path.name
+                )
             ),
             None,
         )
@@ -117,9 +124,15 @@ class RepositoryManager:
         path = Path(repository_path).expanduser().resolve()
 
         if not path.is_dir():
-            raise FileNotFoundError(
-                f"Repository directory does not exist: {path}"
-            )
+            folder_name = path.name
+            backend_root = Path(__file__).resolve().parent.parent
+            local_target = backend_root / "repositories" / folder_name
+            if local_target.is_dir():
+                path = local_target.resolve()
+            else:
+                raise FileNotFoundError(
+                    f"Repository directory does not exist: {path}"
+                )
 
         resolved_path = str(path)
 
@@ -142,6 +155,7 @@ class RepositoryManager:
                                 item.get("repository_path", "")
                             ).expanduser().resolve()
                         ) == resolved_path
+                        or Path(item.get("repository_path", "")).name == path.name
                     ),
                     {},
                 )

@@ -400,22 +400,54 @@ def get_saved_repositories():
 def activate_repository(
     request: RepositoryActivationRequest,
 ):
+    req_path = request.repository_path
+    req_folder = Path(req_path).name
+
     repository = next(
         (
             item
             for item in repository_manager.get_saved_repositories()
-            if item.get("repository_path")
-            == request.repository_path
+            if item.get("repository_path") == req_path
+            or item.get("normalized_url") == req_path
+            or Path(item.get("repository_path", "")).name == req_folder
         ),
         None,
     )
 
-    if (
-        repository is None
-        or not os.path.isdir(
-            repository.get("repository_path", "")
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="That repository is unavailable. Import it again.",
         )
-    ):
+
+    current_path = repository.get("repository_path", "")
+    folder_name = Path(current_path).name
+    local_target = BACKEND_ROOT / "repositories" / folder_name
+
+    if os.path.isdir(current_path):
+        target_path = current_path
+    elif local_target.is_dir():
+        target_path = str(local_target)
+        repository["repository_path"] = target_path
+        from app.repository_storage import save_repository
+        save_repository(repository)
+    elif repository.get("repo_url"):
+        try:
+            from app.github.clone_repo import clone_repository
+            from app.repository_storage import save_repository
+            target_path = clone_repository(
+                repository["repo_url"],
+                repository.get("repository", folder_name),
+            )
+            repository["repository_path"] = target_path
+            save_repository(repository)
+        except Exception:
+            logger.exception("Failed to auto-clone repository on activation")
+            raise HTTPException(
+                status_code=500,
+                detail="Could not restore repository files on server. Import it again.",
+            )
+    else:
         raise HTTPException(
             status_code=404,
             detail="That repository is unavailable. Import it again.",
@@ -424,16 +456,17 @@ def activate_repository(
     try:
         repository_manager.set_repository(
             repository_name=repository["repository"],
-            repository_path=repository["repository_path"],
+            repository_path=target_path,
             repo_url=repository.get("repo_url"),
             files=repository.get("files", 0),
             chunks=repository.get("chunks", 0),
         )
 
-        setup_active_services(repository["repository_path"])
+        setup_active_services(target_path)
 
         return {
             **repository,
+            "repository_path": target_path,
             "loaded": True,
         }
 
