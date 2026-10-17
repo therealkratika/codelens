@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-export const getBackendHealth = () => apiRequest("/");
+export const getBackendHealth = () => apiRequest("/health");
 export const getSavedRepositories = () => apiRequest("/api/repository/saved");
 export const getRepositoryStatus = () => apiRequest("/api/repository/status");
 export const importRepository = (repoUrl) =>

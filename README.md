@@ -52,7 +52,7 @@ of allowed frontend origins. The default includes the deployed frontend and
 the local Vite origins:
 
 ```dotenv
-CODELENS_CORS_ORIGINS=https://codelens-flax.vercel.app,http://localhost:5173,http://127.0.0.1:5173
+CODELENS_CORS_ORIGINS=https://codelens-flax.vercel.app,https://codelens-fbcl.vercel.app,http://localhost:5173,http://127.0.0.1:5173
 ```
 
 Get a key from [Google AI Studio](https://aistudio.google.com/app/apikey). Do not commit `.env` files or share the key. The backend loads `GEMINI_API_KEY` from its environment.

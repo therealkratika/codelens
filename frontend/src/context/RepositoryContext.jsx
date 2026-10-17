@@ -64,6 +64,13 @@ export function RepositoryProvider({ children }) {
   async function sendChat(question) {
     const content = question.trim();
     if (!content || chat.busy) return;
+    if (!repositoryPath) {
+      setChat((current) => ({
+        ...current,
+        error: "Import and activate a repository before starting a chat.",
+      }));
+      return;
+    }
     setChat((current) => ({
       ...current,
       messages: [...current.messages, { role: "user", content }],

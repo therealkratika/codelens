@@ -1,5 +1,5 @@
 const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:8000"
+  import.meta.env.VITE_API_URL
 ).replace(/\/+$/, "");
 
 const API_TIMEOUT_MS = Number(
@@ -24,11 +24,13 @@ export async function apiRequest(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const detail = data.detail || data.error || data.message;
-      throw new Error(
+      const error = new Error(
         typeof detail === "string"
           ? detail
           : `Request failed (${response.status})`,
       );
+      error.status = response.status;
+      throw error;
     }
     return data;
   } catch (error) {
